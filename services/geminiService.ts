@@ -95,7 +95,12 @@ export const getAIQuote = async (): Promise<string> => {
                 thinkingConfig: { thinkingBudget: 10 }
             }
         });
-        return response.text.trim();
+        const text = response.text;
+        if (!text) {
+            console.warn("AI quote response was empty or blocked.");
+            return fallbackQuote;
+        }
+        return text.trim();
     } catch (error) {
         console.error("Failed to get AI quote:", error);
         return fallbackQuote;
@@ -144,8 +149,13 @@ export const getAIRecommendations = async (): Promise<LearningResource[]> => {
             }
         });
 
-        const jsonText = response.text.trim();
-        const parsedResponse = JSON.parse(jsonText);
+        const jsonText = response.text;
+        if (!jsonText) {
+            console.warn("AI recommendations response was empty or blocked.");
+            return fallbackData;
+        }
+
+        const parsedResponse = JSON.parse(jsonText.trim());
         const resources = parsedResponse.resources || [];
         
         return resources.map((r: any, index: number) => ({ ...r, id: (index + 1).toString() } as LearningResource));
@@ -176,7 +186,12 @@ export const getSkillCoachResponse = async (question: string, skills: Skill[]): 
                 maxOutputTokens: 150,
             }
         });
-        return response.text.trim();
+        const text = response.text;
+        if (!text) {
+             console.warn("AI skill coach response was empty or blocked.");
+             return fallbackResponse;
+        }
+        return text.trim();
     } catch (error) {
         console.error("Failed to get AI skill coach response:", error);
         return fallbackResponse;
