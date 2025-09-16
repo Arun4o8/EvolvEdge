@@ -1,3 +1,4 @@
+import React from 'react';
 
 export interface Skill {
   subject: string;
@@ -57,6 +58,13 @@ export interface PlannerEvent {
     time: string;
     title: string;
     category: 'work' | 'skill' | 'personal';
+}
+
+export interface Routine {
+  id: string;
+  title: string;
+  category: string;
+  completed: boolean;
 }
 
 export enum Theme {

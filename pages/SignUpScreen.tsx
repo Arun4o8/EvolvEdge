@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -8,7 +7,7 @@ export const SignUpScreen: React.FC = () => {
     const handleSignUp = (e: React.FormEvent) => {
         e.preventDefault();
         // Here you would handle the sign up logic
-        navigate('/home');
+        navigate('/skill-selection');
     };
 
     return (

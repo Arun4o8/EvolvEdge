@@ -197,3 +197,44 @@ export const getSkillCoachResponse = async (question: string, skills: Skill[]): 
         return fallbackResponse;
     }
 };
+
+export const getSkillAnalytics = async (skills: Skill[]): Promise<string> => {
+    const gemini = await initializeGemini();
+    const fallbackResponse = "I'm sorry, I can't provide skill analytics right now. Please try again later.";
+
+    if (!gemini) {
+        return fallbackResponse;
+    }
+    
+    if (skills.length === 0) {
+        return "You haven't selected any skills to analyze. Go to the skills page to add some!";
+    }
+
+    const skillSummary = skills.map(s => `${s.subject} at ${s.level}%`).join(', ');
+
+    try {
+        const response = await gemini.ai.models.generateContent({
+            model: model,
+            contents: `The user's skills are: ${skillSummary}.`,
+            config: {
+                systemInstruction: `You are an expert personal development coach. Analyze the user's skills and provide actionable insights.
+                Format your response with clear sections. Use **bold** for headings.
+                1.  **Overall Summary:** A brief, encouraging summary of their skill profile.
+                2.  **Strongest Skill:** Identify their strongest skill, explain why it's valuable, and suggest how they can leverage it.
+                3.  **Area for Improvement:** Identify their weakest skill and provide a concrete, actionable tip to improve it this week.
+                4.  **Suggested Focus:** Recommend one or two skills to focus on for balanced growth.`,
+                temperature: 0.7,
+                maxOutputTokens: 400,
+            }
+        });
+        const text = response.text;
+        if (!text) {
+             console.warn("AI skill analytics response was empty or blocked.");
+             return fallbackResponse;
+        }
+        return text.trim();
+    } catch (error) {
+        console.error("Failed to get AI skill analytics:", error);
+        return fallbackResponse;
+    }
+};

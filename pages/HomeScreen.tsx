@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { TargetIcon, ChartIcon } from '../constants';
 import { QuoteOfTheDay } from '../components/QuoteOfTheDay';
 import { PlannerContext } from '../context/PlannerContext';
-import { LearningResource, PlannerEvent } from '../types';
+import { LearningResource, PlannerEvent, Routine } from '../types';
 import { getAIRecommendations } from '../services/geminiService';
+import { SkillContext } from '../context/SkillContext';
+import { RoutineContext } from '../context/RoutineContext';
 
 const ResourceCard: React.FC<{ resource: LearningResource }> = ({ resource }) => {
     const iconMap = {
@@ -48,6 +50,56 @@ const categoryColors: Record<PlannerEvent['category'], string> = {
     personal: 'border-green-500',
 }
 
+const SkillSummaryContent: React.FC = () => {
+    const skillContext = useContext(SkillContext);
+    
+    if (!skillContext || skillContext.isLoading || skillContext.skills.length === 0) {
+        return <p>Start tracking your skills to see your progress here!</p>;
+    }
+    
+    const strongestSkill = skillContext.skills.reduce((max, skill) => skill.level > max.level ? skill : max, skillContext.skills[0]);
+
+    return <p>Your strongest skill is <strong>{strongestSkill.subject}</strong> at <strong>{strongestSkill.level}%</strong>. Great job!</p>;
+}
+
+const TodaysRoutines: React.FC = () => {
+    const routineContext = useContext(RoutineContext);
+
+    if (!routineContext || routineContext.isLoading) {
+        return <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md animate-pulse h-24"></div>;
+    }
+    
+    const { routines, toggleRoutine } = routineContext;
+    if (routines.length === 0) {
+        return null; // Don't show the card if there are no routines
+    }
+
+    return (
+        <div>
+            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-3">Today's Routines</h3>
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md space-y-3">
+                {routines.map(routine => (
+                    <div key={routine.id} className="flex items-center">
+                        <input
+                            id={`routine-${routine.id}`}
+                            type="checkbox"
+                            checked={routine.completed}
+                            onChange={() => toggleRoutine(routine.id)}
+                            className="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                        <label
+                            htmlFor={`routine-${routine.id}`}
+                            className={`ml-3 text-slate-700 dark:text-slate-300 cursor-pointer transition-colors ${routine.completed ? 'line-through text-slate-500 dark:text-slate-400' : ''}`}
+                        >
+                            {routine.title}
+                        </label>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 export const HomeScreen: React.FC = () => {
     const [resources, setResources] = useState<LearningResource[]>([]);
     const [loadingResources, setLoadingResources] = useState(true);
@@ -78,6 +130,8 @@ export const HomeScreen: React.FC = () => {
             </div>
             
             <QuoteOfTheDay />
+            
+            <TodaysRoutines />
 
             <div>
                 <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-3">Today's Focus</h3>
@@ -116,7 +170,7 @@ export const HomeScreen: React.FC = () => {
             </SummaryCard>
 
             <SummaryCard title="Skill Progress" link="/skills" icon={<ChartIcon />}>
-                <p>Your "Public Speaking" skill has increased by <strong>15%</strong> this month. Great job!</p>
+                <SkillSummaryContent />
             </SummaryCard>
         </div>
     );
