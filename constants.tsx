@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export const MoonIcon: React.FC = () => (
@@ -127,6 +126,12 @@ export const TrashIcon: React.FC<{className?: string}> = ({className}) => (
 export const CloseIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+);
+
+export const QuoteIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M5.5 2.5a1 1 0 00-1.898.666l-1.58 6.32A1 1 0 003 11.5v2a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 00-1-1H4.08l1.264-5.056A1 1 0 005.5 2.5zM13.5 2.5a1 1 0 00-1.898.666l-1.58 6.32A1 1 0 0011 11.5v2a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 00-1-1h-1.92l1.264-5.056A1 1 0 0013.5 2.5z" clipRule="evenodd" />
     </svg>
 );
 

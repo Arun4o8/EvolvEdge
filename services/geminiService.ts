@@ -1,4 +1,3 @@
-
 import { LearningResource } from '../types';
 
 let geminiPromise: Promise<{
@@ -76,6 +75,31 @@ export const createAIChat = async (): Promise<any | null> => {
         },
         tools: [plannerTool]
     });
+};
+
+export const getAIQuote = async (): Promise<string> => {
+    const gemini = await initializeGemini();
+    const fallbackQuote = "The only way to do great work is to love what you do.";
+
+    if (!gemini) {
+        return fallbackQuote;
+    }
+
+    try {
+        const response = await gemini.ai.models.generateContent({
+            model: model,
+            contents: "Generate one short, impactful, motivational quote about personal growth or learning. Return only the quote text, without any introductory phrases or quotation marks.",
+            config: {
+                maxOutputTokens: 50,
+                temperature: 0.9,
+                thinkingConfig: { thinkingBudget: 10 }
+            }
+        });
+        return response.text.trim();
+    } catch (error) {
+        console.error("Failed to get AI quote:", error);
+        return fallbackQuote;
+    }
 };
 
 export const getAIRecommendations = async (): Promise<LearningResource[]> => {
