@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { NAV_ITEMS, SparklesIcon } from '../constants';
+import { NAV_ITEMS } from '../constants';
 
 export const BottomNav: React.FC = () => {
     const location = useLocation();
@@ -28,17 +27,6 @@ export const BottomNav: React.FC = () => {
                         </NavLink>
                     );
                 })}
-                 <NavLink
-                    to="/ai-chat"
-                     className={({ isActive }) =>
-                        `absolute -top-6 flex items-center justify-center w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 transition-all transform hover:scale-110 ${
-                         isActive ? 'ring-4 ring-primary-300 dark:ring-primary-500' : ''
-                        }`
-                    }
-                    style={{left: '50%', transform: 'translateX(-50%)'}}
-                >
-                    <SparklesIcon />
-                </NavLink>
             </nav>
         </footer>
     );
