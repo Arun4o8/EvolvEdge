@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
@@ -21,6 +20,7 @@ import { NotificationsScreen } from './pages/NotificationsScreen';
 import { AchievementsScreen } from './pages/AchievementsScreen';
 import { ResourcesScreen } from './pages/ResourcesScreen';
 import { SupportScreen } from './pages/SupportScreen';
+import { SkillCoachScreen } from './pages/SkillCoachScreen';
 
 function App() {
   return (
@@ -59,6 +59,7 @@ function App() {
                     <Route path="/achievements" element={<AchievementsScreen />} />
                     <Route path="/resources" element={<ResourcesScreen />} />
                     <Route path="/support" element={<SupportScreen />} />
+                    <Route path="/skill-coach" element={<SkillCoachScreen />} />
                     
                     <Route path="*" element={<Navigate to="/" />} />
                 </Routes>

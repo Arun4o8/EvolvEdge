@@ -1,4 +1,4 @@
-import { LearningResource } from '../types';
+import { LearningResource, Skill } from '../types';
 
 let geminiPromise: Promise<{
     ai: any;
@@ -153,5 +153,32 @@ export const getAIRecommendations = async (): Promise<LearningResource[]> => {
     } catch (error) {
         console.error("Failed to get AI recommendations:", error);
         return fallbackData;
+    }
+};
+
+export const getSkillCoachResponse = async (question: string, skills: Skill[]): Promise<string> => {
+    const gemini = await initializeGemini();
+    const fallbackResponse = "I'm sorry, I can't provide skill advice right now. Please try again later.";
+
+    if (!gemini) {
+        return fallbackResponse;
+    }
+
+    const skillSummary = skills.map(s => `${s.subject} is at ${s.level}%`).join(', ');
+
+    try {
+        const response = await gemini.ai.models.generateContent({
+            model: model,
+            contents: `The user's current skills are: ${skillSummary}. The user asked: "${question}"`,
+            config: {
+                systemInstruction: "You are an AI Skill Coach. Your role is to provide clear, concise, and encouraging advice based on the user's skill levels. Answer their questions about how to improve, what to learn next, or explain concepts related to their skills. Keep your responses conversational and brief, as they will be spoken aloud.",
+                temperature: 0.7,
+                maxOutputTokens: 150,
+            }
+        });
+        return response.text.trim();
+    } catch (error) {
+        console.error("Failed to get AI skill coach response:", error);
+        return fallbackResponse;
     }
 };

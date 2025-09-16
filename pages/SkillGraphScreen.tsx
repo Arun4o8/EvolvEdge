@@ -1,8 +1,9 @@
-
 import React from 'react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Skill } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useNavigate } from 'react-router-dom';
+import { MicrophoneIcon } from '../constants';
 
 const data: Skill[] = [
   { subject: 'Leadership', level: 85, fullMark: 100 },
@@ -15,13 +16,27 @@ const data: Skill[] = [
 
 export const SkillGraphScreen: React.FC = () => {
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const isDark = theme === 'dark';
   const textColor = isDark ? '#e2e8f0' : '#475569';
   const gridColor = isDark ? '#475569' : '#d1d5db';
+  
+  const handleAskCoach = () => {
+    navigate('/skill-coach', { state: { skills: data } });
+  };
 
   return (
     <div className="space-y-6">
       <p className="text-slate-600 dark:text-slate-400">Here's a snapshot of your current skill levels. Keep tracking your learning to see them grow!</p>
+      
+       <button 
+        onClick={handleAskCoach}
+        className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors shadow-md"
+      >
+        <MicrophoneIcon />
+        Ask AI Skill Coach
+      </button>
+
       <div className="w-full h-80 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md">
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
