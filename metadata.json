@@ -1,0 +1,7 @@
+{
+  "name": "EvolvEdge AI",
+  "description": "EvolvEdge AI is a smart personal development assistant designed to help users track, grow, and optimize their skills, goals, and habits. It leverages AI to provide guidance, insights, and personalized recommendations.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
