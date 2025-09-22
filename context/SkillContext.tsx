@@ -8,6 +8,7 @@ interface SkillContextType {
   initializeSkills: (skills: Omit<Skill, 'id' | 'user_id'>[]) => void;
   addSkill: (newSkill: { subject: string, level?: number }) => Promise<void>;
   updateSkill: (subject: string, level: number) => void;
+  deleteSkill: (subject: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -164,8 +165,32 @@ export const SkillProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
     };
 
+    const deleteSkill = async (subject: string) => {
+        if (!user) return;
+        
+        const oldSkills = skills;
+        setSkills(prev => prev.filter(s => s.subject !== subject));
+
+        try {
+            const { error } = await supabase
+                .from('skills')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('subject', subject);
+            
+            if (error) throw error;
+        } catch (error: any) {
+            if (error.message.includes('Could not find the table')) {
+                console.warn("Backend missing 'skills' table. Skill deleted from local state only.");
+            } else {
+                console.error("Error deleting skill:", error.message);
+                setSkills(oldSkills);
+            }
+        }
+    };
+
     return (
-        <SkillContext.Provider value={{ skills, initializeSkills, addSkill, updateSkill, isLoading }}>
+        <SkillContext.Provider value={{ skills, initializeSkills, addSkill, updateSkill, deleteSkill, isLoading }}>
             {children}
         </SkillContext.Provider>
     );

@@ -242,6 +242,8 @@ export const getSkillCoachResponse = async (question: string, skills: Skill[]): 
                 systemInstruction: "You are an AI Skill Coach. Your role is to provide clear, concise, and encouraging advice based on the user's skill levels. Answer their questions about how to improve, what to learn next, or explain concepts related to their skills. Keep your responses conversational and brief, as they will be spoken aloud.",
                 temperature: 0.7,
                 maxOutputTokens: 150,
+                // FIX: Added thinkingBudget because maxOutputTokens is set for gemini-2.5-flash model
+                thinkingConfig: { thinkingBudget: 50 },
             }
         });
         // FIX: The `.text` property directly provides the string output from the `GenerateContentResponse`.
@@ -284,6 +286,8 @@ export const getSkillAnalytics = async (skills: Skill[]): Promise<string> => {
                 4.  **Suggested Focus:** Recommend one or two skills to focus on for balanced growth.`,
                 temperature: 0.7,
                 maxOutputTokens: 400,
+                // FIX: Added thinkingBudget because maxOutputTokens is set for gemini-2.5-flash model
+                thinkingConfig: { thinkingBudget: 100 },
             }
         });
         // FIX: The `.text` property directly provides the string output from the `GenerateContentResponse`.
@@ -325,6 +329,8 @@ export const getSkillAssessmentAndRoadmap = async (newSkill: string, existingSki
                 Keep the tone positive, concise, and actionable.`,
                 temperature: 0.7,
                 maxOutputTokens: 500,
+                // FIX: Added thinkingBudget because maxOutputTokens is set for gemini-2.5-flash model
+                thinkingConfig: { thinkingBudget: 100 },
             }
         });
         const text = response.text;
@@ -374,6 +380,8 @@ export const getCareerAdvice = async (skills: Skill[], goals: Pick<Goal, 'title'
                 Keep the tone positive and empowering.`,
                 temperature: 0.8,
                 maxOutputTokens: 600,
+                // FIX: Added thinkingBudget because maxOutputTokens is set for gemini-2.5-flash model
+                thinkingConfig: { thinkingBudget: 100 },
             }
         });
         const text = response.text;

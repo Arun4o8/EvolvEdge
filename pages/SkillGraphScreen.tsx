@@ -6,7 +6,7 @@ import { useTheme } from '../hooks/useTheme';
 // FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
 import * as ReactRouterDOM from 'react-router-dom';
 const { useNavigate } = ReactRouterDOM;
-import { CloseIcon, MicrophoneIcon, SearchIcon, SparklesIcon } from '../constants';
+import { CloseIcon, PencilIcon, SearchIcon, SparklesIcon, TrashIcon } from '../constants';
 import { SkillContext } from '../context/SkillContext';
 import { getSkillAnalytics, getSkillAssessmentAndRoadmap } from '../services/geminiService';
 import { useAuth } from '../context/AuthContext';
@@ -29,6 +29,7 @@ export const SkillGraphScreen: React.FC = () => {
   
   const [analytics, setAnalytics] = useState<string>('');
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
   const [newSkillQuery, setNewSkillQuery] = useState('');
@@ -46,7 +47,7 @@ export const SkillGraphScreen: React.FC = () => {
   };
 
   if (!skillContext) return null; // Or a loading spinner
-  const { skills, isLoading } = skillContext;
+  const { skills, isLoading, deleteSkill } = skillContext;
   
   const handleAskCoach = () => {
     navigate('/ai-chat');
@@ -143,8 +144,22 @@ export const SkillGraphScreen: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <p className="text-slate-600 dark:text-slate-400">Here's a snapshot of your current skill levels. Ask the AI for an analysis or for coaching!</p>
-      
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">Your Skills</h2>
+          <p className="text-slate-600 dark:text-slate-400">Manage your skills or ask the AI for analysis.</p>
+        </div>
+        {skills.length > 0 && (
+          <button
+            onClick={() => setEditMode(!editMode)}
+            className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+          >
+            <PencilIcon className="h-4 w-4" />
+            {editMode ? 'Done' : 'Manage'}
+          </button>
+        )}
+      </div>
+
       <div className="space-y-4">
         <button 
           onClick={handleAskCoach}
@@ -218,14 +233,25 @@ export const SkillGraphScreen: React.FC = () => {
                   <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">{category}</h3>
                   <div className="space-y-4">
                       {groupedSkills[category].map(skill => (
-                          <div key={skill.subject} className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm">
-                              <div className="flex justify-between items-center mb-1">
-                                  <span className="font-medium text-slate-700 dark:text-slate-300">{skill.subject}</span>
-                                  <span className="text-sm font-semibold text-primary-600 dark:text-primary-400">{skill.level}%</span>
+                          <div key={skill.subject} className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm flex items-center gap-4">
+                              <div className="flex-grow">
+                                  <div className="flex justify-between items-center mb-1">
+                                      <span className="font-medium text-slate-700 dark:text-slate-300">{skill.subject}</span>
+                                      <span className="text-sm font-semibold text-primary-600 dark:text-primary-400">{skill.level}%</span>
+                                  </div>
+                                  <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
+                                      <div className="bg-primary-600 h-2.5 rounded-full" style={{ width: `${skill.level}%` }}></div>
+                                  </div>
                               </div>
-                              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
-                                  <div className="bg-primary-600 h-2.5 rounded-full" style={{ width: `${skill.level}%` }}></div>
-                              </div>
+                              {editMode && (
+                                <button
+                                  onClick={() => deleteSkill(skill.subject)}
+                                  className="p-2 text-slate-400 hover:text-red-500 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex-shrink-0"
+                                  aria-label={`Delete skill: ${skill.subject}`}
+                                >
+                                  <TrashIcon className="h-5 w-5" />
+                                </button>
+                              )}
                           </div>
                       ))}
                   </div>
