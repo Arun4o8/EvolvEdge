@@ -1,4 +1,4 @@
-import { LearningResource, Skill } from '../types';
+import { LearningResource, Skill, Goal } from '../types';
 
 let geminiPromise: Promise<{
     ai: any;
@@ -13,7 +13,8 @@ function initializeGemini() {
     }
 
     geminiPromise = (async () => {
-        const API_KEY = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
+        // FIX: API key must be retrieved from process.env.API_KEY.
+        const API_KEY = process.env.API_KEY;
 
         if (!API_KEY) {
             console.error("API_KEY environment variable not set. AI features will be disabled.");
@@ -21,6 +22,7 @@ function initializeGemini() {
         }
 
         try {
+            // FIX: Corrected import casing for GoogleGenAI.
             const { GoogleGenAI, Type } = await import('@google/genai');
             const ai = new GoogleGenAI({ apiKey: API_KEY });
             return { ai, Type };
@@ -92,9 +94,11 @@ export const getAIQuote = async (): Promise<string> => {
             config: {
                 maxOutputTokens: 50,
                 temperature: 0.9,
+                // FIX: Added thinkingBudget because maxOutputTokens is set for gemini-2.5-flash model
                 thinkingConfig: { thinkingBudget: 10 }
             }
         });
+        // FIX: The `.text` property directly provides the string output from the `GenerateContentResponse`.
         const text = response.text;
         if (!text) {
             console.warn("AI quote response was empty or blocked.");
@@ -149,6 +153,7 @@ export const getAIRecommendations = async (): Promise<LearningResource[]> => {
             }
         });
 
+        // FIX: The `.text` property directly provides the string output from the `GenerateContentResponse`.
         const jsonText = response.text;
         if (!jsonText) {
             console.warn("AI recommendations response was empty or blocked.");
@@ -186,6 +191,7 @@ export const getSkillCoachResponse = async (question: string, skills: Skill[]): 
                 maxOutputTokens: 150,
             }
         });
+        // FIX: The `.text` property directly provides the string output from the `GenerateContentResponse`.
         const text = response.text;
         if (!text) {
              console.warn("AI skill coach response was empty or blocked.");
@@ -227,6 +233,7 @@ export const getSkillAnalytics = async (skills: Skill[]): Promise<string> => {
                 maxOutputTokens: 400,
             }
         });
+        // FIX: The `.text` property directly provides the string output from the `GenerateContentResponse`.
         const text = response.text;
         if (!text) {
              console.warn("AI skill analytics response was empty or blocked.");
@@ -235,6 +242,95 @@ export const getSkillAnalytics = async (skills: Skill[]): Promise<string> => {
         return text.trim();
     } catch (error) {
         console.error("Failed to get AI skill analytics:", error);
+        return fallbackResponse;
+    }
+};
+
+export const getSkillAssessmentAndRoadmap = async (newSkill: string, existingSkills: Skill[]): Promise<string> => {
+    const gemini = await initializeGemini();
+    const fallbackResponse = "I'm sorry, I can't provide a skill assessment right now. Please try again later.";
+
+    if (!gemini) {
+        return fallbackResponse;
+    }
+    
+    const skillSummary = existingSkills.length > 0
+        ? `Their current skills are: ${existingSkills.map(s => `${s.subject} at ${s.level}%`).join(', ')}.`
+        : "They have not listed any existing skills yet.";
+
+    try {
+        const response = await gemini.ai.models.generateContent({
+            model: model,
+            contents: `The user wants to learn a new skill: "${newSkill}". ${skillSummary}`,
+            config: {
+                systemInstruction: `You are an expert learning coach. A user wants to learn a new skill. Assume they are a complete beginner in the new skill.
+                
+                Format your response with clear sections using Markdown. Use **bold** for headings.
+                1.  **Initial Assessment:** Briefly assess how their existing skills (if any) might help them learn the new one and provide encouragement.
+                2.  **Learning Roadmap:** Create a step-by-step plan with 3 clear phases (e.g., Phase 1: Foundations, Phase 2: Practical Application, Phase 3: Advanced Topics). For each phase, list 2-3 key topics, projects, or concepts to focus on.
+                
+                Keep the tone positive, concise, and actionable.`,
+                temperature: 0.7,
+                maxOutputTokens: 500,
+            }
+        });
+        const text = response.text;
+        if (!text) {
+             console.warn("AI skill assessment response was empty or blocked.");
+             return fallbackResponse;
+        }
+        return text.trim();
+    } catch (error) {
+        console.error("Failed to get AI skill assessment:", error);
+        return fallbackResponse;
+    }
+};
+
+export const getCareerAdvice = async (skills: Skill[], goals: Pick<Goal, 'title' | 'completed'>[]): Promise<string> => {
+    const gemini = await initializeGemini();
+    const fallbackResponse = "I'm sorry, I can't provide career advice right now. Please try again later.";
+
+    if (!gemini) {
+        return fallbackResponse;
+    }
+
+    if (skills.length === 0 && goals.length === 0) {
+        return "You haven't added any skills or goals yet. Add some from the Skills and Profile pages so I can give you personalized career advice!";
+    }
+
+    const skillSummary = skills.length > 0
+        ? `Current Skills: ${skills.map(s => `${s.subject} (Proficiency: ${s.level}/100)`).join(', ')}.`
+        : "No skills listed.";
+
+    const goalSummary = goals.length > 0
+        ? `Current Goals: ${goals.map(g => `${g.title} (${g.completed ? 'Completed' : 'In Progress'})`).join(', ')}.`
+        : "No goals listed.";
+
+    try {
+        const response = await gemini.ai.models.generateContent({
+            model: model,
+            contents: `Based on the user's profile, provide career advice.\n\n${skillSummary}\n${goalSummary}`,
+            config: {
+                systemInstruction: `You are an expert career advisor. Your goal is to give actionable, encouraging, and personalized career recommendations based on the user's skills and goals.
+                
+                Format your response with clear sections using Markdown. Use **bold** for headings.
+                1.  **Career Path Suggestions:** Based on their current skills and goals, suggest 2-3 specific job roles or career paths that would be a good fit. For each, briefly explain why.
+                2.  **Skill Gap Analysis:** Identify any key skills they might be missing for these roles and suggest how their current skills can be leveraged.
+                3.  **Actionable Roadmap:** Provide a simple, 3-step action plan to help them move towards these career goals. This could include learning a new skill, a type of project to build, or networking advice.
+                
+                Keep the tone positive and empowering.`,
+                temperature: 0.8,
+                maxOutputTokens: 600,
+            }
+        });
+        const text = response.text;
+        if (!text) {
+             console.warn("AI career advice response was empty or blocked.");
+             return fallbackResponse;
+        }
+        return text.trim();
+    } catch (error) {
+        console.error("Failed to get AI career advice:", error);
         return fallbackResponse;
     }
 };

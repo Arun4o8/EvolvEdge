@@ -1,5 +1,9 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+// FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
+import * as ReactRouterDOM from 'react-router-dom';
+const { useLocation, useNavigate } = ReactRouterDOM;
 import { CloseIcon, MicrophoneIcon, SparklesIcon } from '../constants';
 import { getSkillCoachResponse } from '../services/geminiService';
 import { Skill } from '../types';
@@ -11,13 +15,13 @@ export const SkillCoachScreen: React.FC = () => {
     
     const navigate = useNavigate();
     const location = useLocation();
-    const skills = location.state?.skills as Skill[] || [];
+    const skills = (location.state as any)?.skills as Skill[] || [];
 
     const recognitionRef = useRef<any>(null);
     
     useEffect(() => {
-        // @ts-ignore
-        const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+        // FIX: Cast window to `any` to access non-standard SpeechRecognition APIs without TypeScript errors.
+        const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognitionAPI) {
             console.error("Speech Recognition API not supported.");
             setAiResponse("Sorry, voice commands are not supported on this browser.");
@@ -36,15 +40,44 @@ export const SkillCoachScreen: React.FC = () => {
         };
         
         recognition.onend = () => {
-            // Check status to avoid race condition where onresult sets status to 'processing' first
-            if (recognitionRef.current && status === 'listening') {
-                 setStatus('idle');
-            }
+            // Use a functional update to get the latest status. This avoids a dependency on `status`
+            // in the useEffect hook, which would cause the recognition instance to be re-created.
+            setStatus(currentStatus => {
+                if (currentStatus === 'listening') {
+                    // This occurs if listening stops without a result (e.g., timeout).
+                    return 'idle';
+                }
+                // If status is 'processing' or 'speaking', we don't change it here.
+                // The `utterance.onend` handler will reset the status to 'idle'.
+                return currentStatus;
+            });
         };
 
         recognition.onerror = (event: any) => {
             console.error('Speech recognition error:', event.error);
-            setStatus('idle');
+            let errorMessage: string;
+
+            switch (event.error) {
+                case 'no-speech':
+                    errorMessage = "I didn't catch that. Could you please tap the mic and speak again?";
+                    break;
+                case 'audio-capture':
+                    errorMessage = "I can't seem to access your microphone. Please check your browser permissions and try again.";
+                    break;
+                case 'not-allowed':
+                    errorMessage = "I don't have permission to use your microphone. Please enable it in your browser settings.";
+                    break;
+                default:
+                    errorMessage = "Sorry, an unexpected error occurred. Please try again.";
+                    break;
+            }
+            
+            setAiResponse(errorMessage);
+            setStatus('speaking');
+            
+            const utterance = new SpeechSynthesisUtterance(errorMessage);
+            utterance.onend = () => setStatus('idle');
+            window.speechSynthesis.speak(utterance);
         };
 
         recognition.onresult = async (event: any) => {
@@ -81,7 +114,7 @@ export const SkillCoachScreen: React.FC = () => {
                 recognitionRef.current.stop();
             }
         };
-    }, [skills, status]);
+    }, [skills]); // The effect should only re-run if skills change, not on every status update.
 
 
     const handleMicClick = () => {
@@ -97,7 +130,7 @@ export const SkillCoachScreen: React.FC = () => {
     
     const getStatusText = () => {
         switch (status) {
-            case 'listening': return 'Listening...';
+            case 'listening': return 'Listening... Go ahead, I\'m ready.';
             case 'processing': return 'Thinking...';
             case 'speaking': return 'Tap the mic to interrupt and ask a new question.';
             default: return 'Tap the mic and ask about your skills.';

@@ -1,9 +1,9 @@
+
 import React from 'react';
 
 export interface Skill {
   subject: string;
   level: number;
-  fullMark: number;
 }
 
 export interface Goal {
@@ -50,6 +50,8 @@ export interface ChatConversation {
     title: string;
     messages: ChatMessage[];
     timestamp: string;
+    // FIX: Add user_id to align type with database schema and fix usage in AIChatScreen.
+    user_id?: string;
 }
 
 export interface PlannerEvent {

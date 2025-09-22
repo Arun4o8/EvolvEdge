@@ -1,9 +1,12 @@
-import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useContext } from 'react';
+// FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
+import * as ReactRouterDOM from 'react-router-dom';
+const { HashRouter, Routes, Route, Navigate, Outlet } = ReactRouterDOM;
 import { ThemeProvider } from './context/ThemeContext';
 import { PlannerProvider } from './context/PlannerContext';
-import { SkillProvider } from './context/SkillContext';
+import { SkillProvider, SkillContext } from './context/SkillContext';
 import { RoutineProvider } from './context/RoutineContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 import { Layout } from './components/Layout';
 import { SplashScreen } from './pages/SplashScreen';
@@ -25,57 +28,106 @@ import { SupportScreen } from './pages/SupportScreen';
 import { SkillCoachScreen } from './pages/SkillCoachScreen';
 import { SkillSelectionScreen } from './pages/SkillSelectionScreen';
 import { RoutineSelectionScreen } from './pages/RoutineSelectionScreen';
+import { WelcomeScreen } from './pages/WelcomeScreen';
+import { RoadmapsScreen } from './pages/RoadmapsScreen';
+import { CareerAdvisorScreen } from './pages/CareerAdvisorScreen';
+
+const ProtectedRoute: React.FC = () => {
+    const { user, loading } = useAuth();
+
+    if (loading) {
+        return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    }
+
+    if (!user) {
+        return <Navigate to="/login" replace />;
+    }
+
+    return <Outlet />;
+};
+
+const PostLoginRedirect: React.FC = () => {
+    const skillContext = useContext(SkillContext);
+    
+    if (!skillContext || skillContext.isLoading) {
+        return <div className="flex items-center justify-center h-screen">Loading user data...</div>;
+    }
+
+    // If user has no skills, they haven't completed onboarding.
+    if (skillContext.skills.length === 0) {
+        return <Navigate to="/welcome" replace />;
+    }
+      
+    // Otherwise, they're a returning user.
+    return <Navigate to="/home" replace />;
+};
+
+const AuthRoute: React.FC = () => {
+    const { user, loading } = useAuth();
+     if (loading) {
+        return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    }
+    if (user) {
+        // Redirect to a component that decides where to send the user
+        return <PostLoginRedirect />;
+    }
+    return <Outlet />;
+};
+
 
 function App() {
   return (
     <ThemeProvider>
-      <PlannerProvider>
-        <SkillProvider>
-          <RoutineProvider>
-            <div className="max-w-md mx-auto bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 min-h-screen shadow-2xl shadow-slate-400/20 dark:shadow-slate-950/50">
-                <HashRouter>
-                    <Routes>
-                        <Route path="/" element={<SplashScreen />} />
-                        <Route path="/onboarding" element={<OnboardingScreen />} />
-                        <Route path="/login" element={<LoginScreen />} />
-                        <Route path="/signup" element={<SignUpScreen />} />
-                        <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
-                        <Route path="/skill-selection" element={<SkillSelectionScreen />} />
-                        <Route path="/routine-selection" element={<RoutineSelectionScreen />} />
-                        
-                        {/* Authenticated Routes with Layout */}
-                        <Route path="/home" element={<Layout />}>
-                            <Route index element={<HomeScreen />} />
-                        </Route>
-                        <Route path="/skills" element={<Layout />}>
-                            <Route index element={<SkillGraphScreen />} />
-                        </Route>
-                        <Route path="/goals" element={<Layout />}>
-                            <Route index element={<GoalTrackerScreen />} />
-                        </Route>
-                        <Route path="/planner" element={<Layout />}>
-                            <Route index element={<PlannerScreen />} />
-                        </Route>
-                        <Route path="/profile" element={<Layout />}>
-                            <Route index element={<ProfileScreen />} />
-                        </Route>
+      <AuthProvider>
+          <PlannerProvider>
+            <SkillProvider>
+              <RoutineProvider>
+                <div className="max-w-md mx-auto bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 min-h-screen shadow-2xl shadow-slate-400/20 dark:shadow-slate-950/50">
+                    <HashRouter>
+                        <Routes>
+                            <Route path="/" element={<SplashScreen />} />
 
-                        {/* Standalone Authenticated Routes */}
-                        <Route path="/ai-chat" element={<AIChatScreen />} />
-                        <Route path="/settings" element={<SettingsScreen />} />
-                        <Route path="/notifications" element={<NotificationsScreen />} />
-                        <Route path="/achievements" element={<AchievementsScreen />} />
-                        <Route path="/resources" element={<ResourcesScreen />} />
-                        <Route path="/support" element={<SupportScreen />} />
-                        <Route path="/skill-coach" element={<SkillCoachScreen />} />
-                        
-                        <Route path="*" element={<Navigate to="/" />} />
-                    </Routes>
-                </HashRouter>
-            </div>
-          </RoutineProvider>
-        </SkillProvider>
-      </PlannerProvider>
+                            <Route element={<AuthRoute />}>
+                                <Route path="/onboarding" element={<OnboardingScreen />} />
+                                <Route path="/login" element={<LoginScreen />} />
+                                <Route path="/signup" element={<SignUpScreen />} />
+                                <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
+                            </Route>
+
+                            <Route element={<ProtectedRoute />}>
+                                <Route path="/post-login" element={<PostLoginRedirect />} />
+                                <Route path="/welcome" element={<WelcomeScreen />} />
+                                <Route path="/skill-selection" element={<SkillSelectionScreen />} />
+                                <Route path="/routine-selection" element={<RoutineSelectionScreen />} />
+                                
+                                {/* Standalone Authenticated Routes */}
+                                <Route path="/ai-chat" element={<AIChatScreen />} />
+                                <Route path="/settings" element={<SettingsScreen />} />
+                                <Route path="/notifications" element={<NotificationsScreen />} />
+                                <Route path="/achievements" element={<AchievementsScreen />} />
+                                <Route path="/resources" element={<ResourcesScreen />} />
+                                <Route path="/support" element={<SupportScreen />} />
+                                <Route path="/skill-coach" element={<SkillCoachScreen />} />
+                                <Route path="/career-advisor" element={<CareerAdvisorScreen />} />
+                                <Route path="/goals" element={<GoalTrackerScreen />} />
+                                
+                                <Route element={<Layout />}>
+                                    <Route path="/home" element={<HomeScreen />} />
+                                    <Route path="/skills" element={<SkillGraphScreen />} />
+                                    <Route path="/roadmaps" element={<RoadmapsScreen />} />
+                                    <Route path="/planner" element={<PlannerScreen />} />
+                                    <Route path="/profile" element={<ProfileScreen />} />
+                                </Route>
+                            </Route>
+                            
+                            <Route path="*" element={<Navigate to="/" />} />
+                        </Routes>
+                    </HashRouter>
+                </div>
+              </RoutineProvider>
+            </SkillProvider>
+          </PlannerProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

@@ -1,6 +1,9 @@
 
+
 import React from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+// FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
+import * as ReactRouterDOM from 'react-router-dom';
+const { useLocation, Outlet } = ReactRouterDOM;
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { NAV_ITEMS } from '../constants';

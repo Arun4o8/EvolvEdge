@@ -1,9 +1,10 @@
+
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../types';
 import { MoonIcon, SunIcon } from '../constants';
 import { StandaloneHeader } from '../components/StandaloneHeader';
+import { useAuth } from '../context/AuthContext';
 
 const SettingsItem: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
@@ -22,10 +23,10 @@ const Toggle: React.FC = () => {
 
 export const SettingsScreen: React.FC = () => {
     const { theme, toggleTheme } = useTheme();
-    const navigate = useNavigate();
+    const { signOut } = useAuth();
 
-    const handleLogout = () => {
-        navigate('/login');
+    const handleLogout = async () => {
+        await signOut();
     };
 
     return (

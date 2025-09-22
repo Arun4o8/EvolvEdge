@@ -1,5 +1,7 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+// FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
+import * as ReactRouterDOM from 'react-router-dom';
+const { NavLink, useLocation } = ReactRouterDOM;
 import { NAV_ITEMS } from '../constants';
 
 export const BottomNav: React.FC = () => {
@@ -14,7 +16,7 @@ export const BottomNav: React.FC = () => {
                         <NavLink
                             key={item.path}
                             to={item.path}
-                            className={({ isActive }) =>
+                            className={
                                 `flex flex-col items-center justify-center w-full transition-colors duration-200 ${
                                 isActive
                                     ? 'text-primary-600 dark:text-primary-400'

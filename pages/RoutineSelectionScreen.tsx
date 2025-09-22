@@ -1,7 +1,11 @@
+
+
 import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+// FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
+import * as ReactRouterDOM from 'react-router-dom';
+const { useNavigate } = ReactRouterDOM;
 import { RoutineContext } from '../context/RoutineContext';
-import { BookOpenIcon, TargetIcon } from '../constants';
+import { TargetIcon } from '../constants';
 
 const ROUTINE_CATEGORIES = {
   "Mindfulness": ['Morning Meditation', 'Journaling', 'Gratitude Practice', 'Mindful Breathing'],
@@ -12,6 +16,7 @@ const ROUTINE_CATEGORIES = {
 
 export const RoutineSelectionScreen: React.FC = () => {
     const [selectedRoutines, setSelectedRoutines] = useState<{title: string, category: string}[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
     const routineContext = useContext(RoutineContext);
 
@@ -26,10 +31,14 @@ export const RoutineSelectionScreen: React.FC = () => {
         });
     };
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
         if (!routineContext) return;
         
-        routineContext.initializeRoutines(selectedRoutines);
+        setIsSubmitting(true);
+        if (selectedRoutines.length > 0) {
+            await routineContext.initializeRoutines(selectedRoutines);
+        }
+        setIsSubmitting(false);
         navigate('/home');
     };
 
@@ -72,9 +81,10 @@ export const RoutineSelectionScreen: React.FC = () => {
                 
                 <button
                     onClick={handleContinue}
-                    className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+                    disabled={isSubmitting}
+                    className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:bg-primary-400"
                 >
-                    {selectedRoutines.length > 0 ? 'Finish Setup' : 'Skip & Finish'}
+                    {isSubmitting ? 'Saving...' : (selectedRoutines.length > 0 ? 'Finish Setup' : 'Skip & Finish')}
                 </button>
             </div>
         </div>

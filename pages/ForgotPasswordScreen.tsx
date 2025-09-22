@@ -1,6 +1,9 @@
 
+
 import React from 'react';
-import { Link } from 'react-router-dom';
+// FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
+import * as ReactRouterDOM from 'react-router-dom';
+const { Link } = ReactRouterDOM;
 
 export const ForgotPasswordScreen: React.FC = () => {
     return (

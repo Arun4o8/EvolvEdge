@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
+// FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
+import * as ReactRouterDOM from 'react-router-dom';
+const { Link } = ReactRouterDOM;
 import { TargetIcon, ChartIcon } from '../constants';
 import { QuoteOfTheDay } from '../components/QuoteOfTheDay';
 import { PlannerContext } from '../context/PlannerContext';
@@ -7,6 +9,7 @@ import { LearningResource, PlannerEvent, Routine } from '../types';
 import { getAIRecommendations } from '../services/geminiService';
 import { SkillContext } from '../context/SkillContext';
 import { RoutineContext } from '../context/RoutineContext';
+import { useAuth } from '../context/AuthContext';
 
 const ResourceCard: React.FC<{ resource: LearningResource }> = ({ resource }) => {
     const iconMap = {
@@ -37,11 +40,11 @@ const SummaryCard: React.FC<{ title: string; link: string; children: React.React
     </Link>
 );
 
-const getGreeting = () => {
+const getGreeting = (name: string) => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good morning, Alex!";
-    if (hour < 18) return "Good afternoon, Alex!";
-    return "Good evening, Alex!";
+    if (hour < 12) return `Good morning, ${name}!`;
+    if (hour < 18) return `Good afternoon, ${name}!`;
+    return `Good evening, ${name}!`;
 };
 
 const categoryColors: Record<PlannerEvent['category'], string> = {
@@ -53,7 +56,11 @@ const categoryColors: Record<PlannerEvent['category'], string> = {
 const SkillSummaryContent: React.FC = () => {
     const skillContext = useContext(SkillContext);
     
-    if (!skillContext || skillContext.isLoading || skillContext.skills.length === 0) {
+    if (!skillContext || skillContext.isLoading) {
+        return <p>Loading skill summary...</p>;
+    }
+    
+    if (skillContext.skills.length === 0) {
         return <p>Start tracking your skills to see your progress here!</p>;
     }
     
@@ -101,11 +108,14 @@ const TodaysRoutines: React.FC = () => {
 };
 
 export const HomeScreen: React.FC = () => {
+    const { user } = useAuth();
     const [resources, setResources] = useState<LearningResource[]>([]);
     const [loadingResources, setLoadingResources] = useState(true);
     
     const plannerContext = useContext(PlannerContext);
     const todaysEvents = plannerContext?.events.filter(event => event.date === new Date().toISOString().split('T')[0]) || [];
+
+    const userName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User';
 
     useEffect(() => {
         const fetchResources = async () => {
@@ -125,7 +135,7 @@ export const HomeScreen: React.FC = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">{getGreeting()}</h2>
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200 capitalize">{getGreeting(userName)}</h2>
                 <p className="text-slate-600 dark:text-slate-400">Ready to grow today?</p>
             </div>
             
@@ -136,7 +146,7 @@ export const HomeScreen: React.FC = () => {
             <div>
                 <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-3">Today's Focus</h3>
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md">
-                    {todaysEvents.length > 0 ? (
+                    {plannerContext?.isLoading ? <p>Loading events...</p> : todaysEvents.length > 0 ? (
                         <ul className="space-y-3">
                             {todaysEvents.map(event => (
                                 <li key={event.id} className={`flex items-center p-2 rounded-md border-l-4 ${categoryColors[event.category]}`}>
@@ -166,7 +176,7 @@ export const HomeScreen: React.FC = () => {
             </div>
 
             <SummaryCard title="Current Goals" link="/goals" icon={<TargetIcon />}>
-                <p>You have <strong>3 active goals</strong>. You're 75% done with "Read 12 books this year". Keep going!</p>
+                <p>Track your personal and professional objectives. You can do it!</p>
             </SummaryCard>
 
             <SummaryCard title="Skill Progress" link="/skills" icon={<ChartIcon />}>

@@ -1,5 +1,9 @@
+
+
 import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+// FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
+import * as ReactRouterDOM from 'react-router-dom';
+const { useNavigate } = ReactRouterDOM;
 import { SkillContext } from '../context/SkillContext';
 import { SparklesIcon } from '../constants';
 
@@ -14,6 +18,7 @@ const SKILL_CATEGORIES = {
 
 export const SkillSelectionScreen: React.FC = () => {
     const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
     const skillContext = useContext(SkillContext);
 
@@ -23,16 +28,17 @@ export const SkillSelectionScreen: React.FC = () => {
         );
     };
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
         if (!skillContext || selectedSkills.length === 0) return;
         
+        setIsSubmitting(true);
         const initialSkills = selectedSkills.map(subject => ({
             subject,
             level: 10, // Start all skills at a baseline level
-            fullMark: 100
         }));
 
-        skillContext.initializeSkills(initialSkills);
+        await skillContext.initializeSkills(initialSkills);
+        setIsSubmitting(false);
         navigate('/routine-selection');
     };
 
@@ -76,10 +82,10 @@ export const SkillSelectionScreen: React.FC = () => {
 
                 <button
                     onClick={handleContinue}
-                    disabled={selectedSkills.length === 0}
+                    disabled={selectedSkills.length === 0 || isSubmitting}
                     className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:bg-slate-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed"
                 >
-                    Continue
+                    {isSubmitting ? 'Saving...' : 'Continue'}
                 </button>
             </div>
         </div>
