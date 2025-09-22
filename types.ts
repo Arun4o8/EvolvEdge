@@ -25,6 +25,7 @@ export interface Achievement {
   description: string;
   unlocked: boolean;
   date?: string;
+  imageUrl?: string;
 }
 
 export interface Notification {

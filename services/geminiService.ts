@@ -415,11 +415,12 @@ export interface SkillValidationResponse {
     is_certificate: boolean;
     assessment: string;
     suggested_level: number;
+    extracted_name: string;
 }
 
 export const validateSkillWithCertificate = async (skillName: string, image: {mimeType: string, data: string}): Promise<SkillValidationResponse> => {
     const gemini = await initializeGemini();
-    const fallbackResponse: SkillValidationResponse = { is_certificate: false, assessment: "Sorry, I couldn't analyze the certificate at this time. Please try again later.", suggested_level: 0 };
+    const fallbackResponse: SkillValidationResponse = { is_certificate: false, assessment: "Sorry, I couldn't analyze the certificate at this time. Please try again later.", suggested_level: 0, extracted_name: '' };
     if (!gemini) return fallbackResponse;
 
     try {
@@ -431,7 +432,7 @@ export const validateSkillWithCertificate = async (skillName: string, image: {mi
         };
 
         const textPart = {
-            text: `Analyze the provided image for the skill "${skillName}". Determine if it's a legitimate certificate of completion. Evaluate its level (e.g., beginner, intermediate, advanced). Based on this, suggest a new proficiency level as a percentage. Respond ONLY with a valid JSON object.`
+            text: `Analyze the provided image for the skill "${skillName}". Determine if it's a legitimate certificate of completion. Evaluate its level (e.g., beginner, intermediate, advanced). Extract the full name of the person to whom the certificate was issued. Based on this, suggest a new proficiency level as a percentage. Respond ONLY with a valid JSON object.`
         };
 
         const response = await gemini.ai.models.generateContent({
@@ -444,9 +445,10 @@ export const validateSkillWithCertificate = async (skillName: string, image: {mi
                     properties: {
                         is_certificate: { type: gemini.Type.BOOLEAN, description: "True if the image is a valid skill certificate, otherwise false." },
                         assessment: { type: gemini.Type.STRING, description: "A brief, one-sentence summary of the certificate's level and what it signifies." },
-                        suggested_level: { type: gemini.Type.NUMBER, description: "The suggested new skill proficiency level (a number between 10 and 100)." }
+                        suggested_level: { type: gemini.Type.NUMBER, description: "The suggested new skill proficiency level (a number between 10 and 100)." },
+                        extracted_name: { type: gemini.Type.STRING, description: "The full name of the person to whom the certificate was issued. Should be an empty string if no name is found."}
                     },
-                    required: ['is_certificate', 'assessment', 'suggested_level']
+                    required: ['is_certificate', 'assessment', 'suggested_level', 'extracted_name']
                 }
             }
         });

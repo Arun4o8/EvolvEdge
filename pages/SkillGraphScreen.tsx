@@ -162,10 +162,15 @@ export const SkillGraphScreen: React.FC = () => {
     try {
       const base64Image = await fileToBase64(certificateFile);
       const result = await validateSkillWithCertificate(validatingSkill.subject, base64Image);
+      
+      const userName = user?.user_metadata?.display_name || '';
+
       if (!result.is_certificate) {
           setValidationError(result.assessment || "The AI could not confirm this is a valid certificate for the specified skill.");
-      } else {
+      } else if (userName && result.extracted_name && result.extracted_name.toLowerCase().includes(userName.toLowerCase())) {
           setValidationResult(result);
+      } else {
+          setValidationError(`Certificate appears valid, but the name found ("${result.extracted_name}") does not match your profile name ("${userName}").`);
       }
     } catch (error) {
       console.error("Certificate validation failed:", error);
@@ -175,12 +180,47 @@ export const SkillGraphScreen: React.FC = () => {
     }
   };
 
-  const handleAcceptValidation = () => {
-    if (validatingSkill && validationResult) {
+  const handleAcceptValidation = async () => {
+    if (validatingSkill && validationResult && certificateFile && user) {
       updateSkill(validatingSkill.subject, validationResult.suggested_level);
+
+      try {
+        // Upload image to Supabase Storage
+        const filePath = `${user.id}/${validatingSkill.subject.replace(/ /g, '_')}-${Date.now()}`;
+        const { error: uploadError } = await supabase.storage
+          .from('certificates')
+          .upload(filePath, certificateFile);
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data } = supabase.storage
+          .from('certificates')
+          .getPublicUrl(filePath);
+        
+        const publicUrl = data.publicUrl;
+
+        // Add achievement to the database
+        await supabase.from('user_achievements').insert({
+          user_id: user.id,
+          achievement_id: 'skill_verified',
+          title: 'Verified Pro',
+          description: `Validated skill: ${validatingSkill.subject}`,
+          context_data: {
+            imageUrl: publicUrl,
+            skillName: validatingSkill.subject
+          }
+        });
+      
+      } catch (error: any) {
+          console.error("Failed to save certificate or achievement:", error.message);
+          // Don't block the user, the skill level is already updated. Maybe show a toast later.
+      }
+
       closeValidationModal();
     }
   };
+
 
   if (isLoading) {
     return <p>Loading skills...</p>;
