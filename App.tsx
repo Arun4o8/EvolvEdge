@@ -1,3 +1,5 @@
+
+
 import React, { useContext } from 'react';
 // FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
 import * as ReactRouterDOM from 'react-router-dom';
@@ -7,6 +9,7 @@ import { PlannerProvider } from './context/PlannerContext';
 import { SkillProvider, SkillContext } from './context/SkillContext';
 import { RoutineProvider } from './context/RoutineContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { GoalProvider } from './context/GoalContext';
 
 import { Layout } from './components/Layout';
 import { SplashScreen } from './pages/SplashScreen';
@@ -68,8 +71,9 @@ const AuthRoute: React.FC = () => {
         return <div className="flex items-center justify-center h-screen">Loading...</div>;
     }
     if (user) {
-        // Redirect to a component that decides where to send the user
-        return <PostLoginRedirect />;
+        // If a user is already logged in, they shouldn't be on the auth pages.
+        // Redirect them directly to the main application screen.
+        return <Navigate to="/home" replace />;
     }
     return <Outlet />;
 };
@@ -79,8 +83,9 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-          <PlannerProvider>
-            <SkillProvider>
+        <PlannerProvider>
+          <SkillProvider>
+            <GoalProvider>
               <RoutineProvider>
                 <div className="max-w-md mx-auto bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 min-h-screen shadow-2xl shadow-slate-400/20 dark:shadow-slate-950/50">
                     <HashRouter>
@@ -125,8 +130,9 @@ function App() {
                     </HashRouter>
                 </div>
               </RoutineProvider>
-            </SkillProvider>
-          </PlannerProvider>
+            </GoalProvider>
+          </SkillProvider>
+        </PlannerProvider>
       </AuthProvider>
     </ThemeProvider>
   );

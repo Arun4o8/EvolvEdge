@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect } from 'react';
 import { Skill } from '../types';
 import { useAuth } from './AuthContext';
@@ -7,6 +6,7 @@ import { supabase } from '../lib/supabaseClient';
 interface SkillContextType {
   skills: Skill[];
   initializeSkills: (skills: Omit<Skill, 'id' | 'user_id'>[]) => void;
+  addSkill: (newSkill: { subject: string, level?: number }) => Promise<void>;
   updateSkill: (subject: string, level: number) => void;
   isLoading: boolean;
 }
@@ -59,34 +59,81 @@ export const SkillProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const initializeSkills = async (initialSkills: Omit<Skill, 'id'|'user_id'>[]) => {
         if (!user) return;
 
-        const skillsToInsert = initialSkills.map(skill => ({
+        const skillsToUpsert = initialSkills.map(skill => ({
             ...skill,
             user_id: user.id
         }));
 
-        // Optimistic update for UI
-        setSkills(skillsToInsert as Skill[]);
-
         try {
-            const { data, error } = await supabase
+            // FIX: Replaced `insert` with `upsert` and `ignoreDuplicates: true`.
+            // This robustly handles the "duplicate key" error by inserting only new skills
+            // and ignoring any that the user already has, preserving existing progress.
+            const { error: upsertError } = await supabase
                 .from('skills')
-                .insert(skillsToInsert)
-                .select();
+                .upsert(skillsToUpsert, { 
+                    onConflict: 'user_id,subject',
+                    ignoreDuplicates: true 
+                });
             
-            if (error) throw error;
+            if (upsertError) throw upsertError;
 
-            // Replace optimistic data with real data from DB
-            setSkills(data || []);
+            // After upserting, fetch the definitive list of skills from the database
+            // to ensure the local state is perfectly synchronized.
+            const { data: updatedSkills, error: fetchError } = await supabase
+                .from('skills')
+                .select('*')
+                .eq('user_id', user.id);
+
+            if (fetchError) throw fetchError;
+
+            setSkills(updatedSkills || []);
+            
         } catch (error: any) {
             if (error.message.includes('Could not find the table')) {
-                 console.warn("Backend missing 'skills' table. New skills only saved to local state.");
+                console.warn("Backend missing 'skills' table. New skills only saved to local state.");
+                // Fallback to optimistic update if DB is not available
+                const existingSubjects = new Set(skills.map(s => s.subject));
+                const newSkills = skillsToUpsert.filter(s => !existingSubjects.has(s.subject));
+                setSkills(prev => [...prev, ...newSkills as Skill[]]);
             } else {
                 console.error("Error initializing skills:", error.message);
-                // Revert if there was a real error
-                setSkills([]); 
             }
         }
     };
+
+    const addSkill = async (newSkill: { subject: string, level?: number }) => {
+        if (!user) return;
+        
+        if (skills.find(s => s.subject.toLowerCase() === newSkill.subject.toLowerCase())) {
+            console.warn(`Skill "${newSkill.subject}" already exists.`);
+            return;
+        }
+
+        const skillToInsert = {
+            subject: newSkill.subject,
+            level: newSkill.level || 10,
+            user_id: user.id,
+        };
+
+        const oldSkills = skills;
+        setSkills(prev => [...prev, skillToInsert as Skill]);
+
+        try {
+            const { data, error } = await supabase.from('skills').insert(skillToInsert).select().single();
+            if (error) throw error;
+            if (data) {
+                setSkills(prev => prev.map(s => s.subject === data.subject ? data : s));
+            }
+        } catch (error: any) {
+             if (error.message.includes('Could not find the table')) {
+                console.warn("Backend missing 'skills' table. New skill only saved to local state.");
+             } else {
+                console.error("Error adding skill:", error.message);
+                setSkills(oldSkills);
+             }
+        }
+    };
+
 
     const updateSkill = async (subject: string, level: number) => {
         if (!user) return;
@@ -118,7 +165,7 @@ export const SkillProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     return (
-        <SkillContext.Provider value={{ skills, initializeSkills, updateSkill, isLoading }}>
+        <SkillContext.Provider value={{ skills, initializeSkills, addSkill, updateSkill, isLoading }}>
             {children}
         </SkillContext.Provider>
     );

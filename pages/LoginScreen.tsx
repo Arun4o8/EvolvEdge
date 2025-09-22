@@ -15,7 +15,7 @@ export const LoginScreen: React.FC = () => {
     useEffect(() => {
         // Navigate away if the user is already logged in (e.g., after Google Sign-In mock)
         if (user) {
-            navigate('/home');
+            navigate('/post-login');
         }
     }, [user, navigate]);
 
@@ -28,7 +28,7 @@ export const LoginScreen: React.FC = () => {
             if (error) {
                 setError(error.message);
             } else {
-                navigate('/home');
+                navigate('/post-login');
             }
         } catch (err: any) {
              setError(err.message || 'An unexpected error occurred.');

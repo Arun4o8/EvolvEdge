@@ -1,29 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Goal } from '../types';
+
+import React, { useState } from 'react';
+import { Goal, Task } from '../types';
 import { CloseIcon, TrashIcon } from '../constants';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabaseClient';
 import { StandaloneHeader } from '../components/StandaloneHeader';
+import { useGoals } from '../context/GoalContext';
 
-interface Task {
-    id: string;
-    description: string;
-    completed: boolean;
-}
-
-interface GoalWithTasks extends Omit<Goal, 'tasks'> {
-    tasks: Task[];
-}
-
-const MOCK_GOALS: GoalWithTasks[] = [
-    { id: 'mock-g-1', title: 'Run a 5k marathon', completed: false, tasks: [
-        { id: 'mock-t-1', description: 'Run 1k', completed: true },
-        { id: 'mock-t-2', description: 'Run 3k', completed: false },
-    ]},
-    { id: 'mock-g-2', title: 'Learn to cook a new dish', completed: true, tasks: [] },
-];
-
-const GoalItem: React.FC<{ goal: GoalWithTasks; onDelete: (id: string) => void; onToggle: (id: string, completed: boolean) => void; onTaskToggle: (id: string, completed: boolean) => void; }> = ({ goal, onDelete, onToggle, onTaskToggle }) => {
+const GoalItem: React.FC<{ goal: Goal; onDelete: (id: string) => void; onToggle: (id: string, completed: boolean) => void; onTaskToggle: (id: string, completed: boolean) => void; }> = ({ goal, onDelete, onToggle, onTaskToggle }) => {
     const completedTasks = goal.tasks.filter(t => t.completed).length;
     const progress = goal.tasks.length > 0 ? (completedTasks / goal.tasks.length) * 100 : (goal.completed ? 100 : 0);
 
@@ -68,129 +50,16 @@ const GoalItem: React.FC<{ goal: GoalWithTasks; onDelete: (id: string) => void; 
 }
 
 export const GoalTrackerScreen: React.FC = () => {
-    const { user } = useAuth();
-    const [goals, setGoals] = useState<GoalWithTasks[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { goals, isLoading, addGoal, deleteGoal, toggleGoal, toggleTask } = useGoals();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newGoalTitle, setNewGoalTitle] = useState('');
 
-    useEffect(() => {
-        const fetchGoals = async () => {
-            if (!user) return;
-            setIsLoading(true);
-            try {
-                const { data, error } = await supabase
-                    .from('goals')
-                    .select('*, tasks(*)')
-                    .eq('user_id', user.id)
-                    .order('created_at', { ascending: false });
-
-                if (error) throw error;
-                setGoals(data as GoalWithTasks[]);
-
-            } catch (error: any) {
-                 if (error.message.includes('Could not find the table')) {
-                     console.warn("Backend missing 'goals' table. Falling back to mock data.");
-                     setGoals(MOCK_GOALS);
-                 } else {
-                    console.error("Error fetching goals:", error.message);
-                 }
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchGoals();
-    }, [user]);
-
     const handleAddGoal = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (newGoalTitle.trim() === '' || !user) return;
-
-        const tempId = `mock-g-${Date.now()}`;
-        const newGoal: GoalWithTasks = {
-            id: tempId,
-            title: newGoalTitle.trim(),
-            completed: false,
-            tasks: [],
-        };
-        setGoals(prevGoals => [newGoal, ...prevGoals]);
+        if (newGoalTitle.trim() === '') return;
+        await addGoal({ title: newGoalTitle.trim() });
         setNewGoalTitle('');
         setIsModalOpen(false);
-
-        try {
-            const { data, error } = await supabase
-                .from('goals')
-                .insert({ title: newGoalTitle.trim(), user_id: user.id })
-                .select('*, tasks(*)')
-                .single();
-            
-            if (error) throw error;
-            
-            if (data) {
-                setGoals(prevGoals => prevGoals.map(g => g.id === tempId ? data as GoalWithTasks : g));
-            }
-        } catch (error: any) {
-            if (error.message.includes('Could not find the table')) {
-                console.warn("Backend missing 'goals' table. Goal only added to local state.");
-            } else {
-                console.error("Error adding goal:", error.message);
-                setGoals(prevGoals => prevGoals.filter(g => g.id !== tempId));
-            }
-        }
-    };
-
-    const handleDeleteGoal = async (goalId: string) => {
-        const oldGoals = goals;
-        setGoals(prevGoals => prevGoals.filter(goal => goal.id !== goalId));
-        
-        try {
-            const { error } = await supabase.from('goals').delete().eq('id', goalId);
-            if (error) throw error;
-        } catch (error: any) {
-            if (error.message.includes('Could not find the table')) {
-                console.warn("Backend missing 'goals' table. Goal only deleted from local state.");
-            } else {
-                console.error("Error deleting goal:", error.message);
-                setGoals(oldGoals);
-            }
-        }
-    };
-
-    const handleToggleGoal = async (goalId: string, completed: boolean) => {
-         const oldGoals = goals;
-         setGoals(prevGoals => prevGoals.map(g => g.id === goalId ? {...g, completed} : g));
-         
-         try {
-            const { error } = await supabase.from('goals').update({ completed }).eq('id', goalId);
-            if (error) throw error;
-         } catch(error: any) {
-            if (error.message.includes('Could not find the table')) {
-                console.warn("Backend missing 'goals' table. Goal toggle only saved to local state.");
-            } else {
-                console.error("Error toggling goal:", error.message);
-                setGoals(oldGoals);
-            }
-         }
-    };
-
-    const handleToggleTask = async (taskId: string, completed: boolean) => {
-        const oldGoals = goals;
-        setGoals(prevGoals => prevGoals.map(g => ({
-            ...g,
-            tasks: g.tasks.map(t => t.id === taskId ? {...t, completed} : t)
-        })));
-        
-        try {
-            const { error } = await supabase.from('tasks').update({ completed }).eq('id', taskId);
-            if (error) throw error;
-        } catch(error: any) {
-            if (error.message.includes('Could not find the table')) {
-                console.warn("Backend missing 'tasks' table. Task toggle only saved to local state.");
-            } else {
-                console.error("Error toggling task:", error.message);
-                setGoals(oldGoals);
-            }
-        }
     };
 
     if (isLoading) {
@@ -215,12 +84,12 @@ export const GoalTrackerScreen: React.FC = () => {
                         + Add New Goal
                     </button>
                     <div className="space-y-4">
-                        {goals.filter(g => !g.completed).map(goal => <GoalItem key={goal.id} goal={goal} onDelete={handleDeleteGoal} onToggle={handleToggleGoal} onTaskToggle={handleToggleTask} />)}
+                        {goals.filter(g => !g.completed).map(goal => <GoalItem key={goal.id} goal={goal} onDelete={deleteGoal} onToggle={toggleGoal} onTaskToggle={toggleTask} />)}
                     </div>
                     <div>
                         <h3 className="text-lg font-bold text-slate-400 dark:text-slate-500 my-4">Completed</h3>
                         <div className="space-y-4 opacity-60">
-                            {goals.filter(g => g.completed).map(goal => <GoalItem key={goal.id} goal={goal} onDelete={handleDeleteGoal} onToggle={handleToggleGoal} onTaskToggle={handleToggleTask} />)}
+                            {goals.filter(g => g.completed).map(goal => <GoalItem key={goal.id} goal={goal} onDelete={deleteGoal} onToggle={toggleGoal} onTaskToggle={toggleTask} />)}
                         </div>
                     </div>
 

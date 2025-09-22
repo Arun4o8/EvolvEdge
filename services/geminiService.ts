@@ -1,3 +1,4 @@
+
 import { LearningResource, Skill, Goal } from '../types';
 
 let geminiPromise: Promise<{
@@ -39,7 +40,7 @@ export const createAIChat = async (): Promise<any | null> => {
     const gemini = await initializeGemini();
     if (!gemini) return null;
 
-    const plannerTool = {
+    const tools = {
         functionDeclarations: [
             {
                 name: 'create_plan',
@@ -47,24 +48,69 @@ export const createAIChat = async (): Promise<any | null> => {
                 parameters: {
                     type: gemini.Type.OBJECT,
                     properties: {
-                        title: {
-                            type: gemini.Type.STRING,
-                            description: 'The title or name of the event. E.g., "Learn React Hooks".'
-                        },
-                        date: {
-                            type: gemini.Type.STRING,
-                            description: 'The date of the event in YYYY-MM-DD format. If the user says "today" or "tomorrow", calculate the appropriate date. E.g., "2024-07-26".'
-                        },
-                        time: {
-                            type: gemini.Type.STRING,
-                            description: 'The time of the event. E.g., "10:00 AM".'
-                        },
-                        category: {
-                            type: gemini.Type.STRING,
-                            description: 'The category of the event. Must be one of: "work", "skill", or "personal".'
-                        }
+                        title: { type: gemini.Type.STRING, description: 'The title or name of the event. E.g., "Learn React Hooks".' },
+                        date: { type: gemini.Type.STRING, description: 'The date of the event in YYYY-MM-DD format. E.g., "2024-07-26".' },
+                        time: { type: gemini.Type.STRING, description: 'The time of the event. E.g., "10:00 AM".' },
+                        category: { type: gemini.Type.STRING, description: 'The category of the event. Must be one of: "work", "skill", or "personal".' }
                     },
                     required: ['title', 'date', 'time', 'category']
+                }
+            },
+            {
+                name: 'add_new_goal',
+                description: 'Adds a new goal to the user\'s goal tracker.',
+                parameters: {
+                    type: gemini.Type.OBJECT,
+                    properties: {
+                        goalTitle: { type: gemini.Type.STRING, description: 'The title of the new goal. E.g., "Run a 10k marathon".' }
+                    },
+                    required: ['goalTitle']
+                }
+            },
+            {
+                name: 'add_daily_routine',
+                description: 'Adds a new daily routine for the user to practice.',
+                parameters: {
+                    type: gemini.Type.OBJECT,
+                    properties: {
+                        routineTitle: { type: gemini.Type.STRING, description: 'The title of the new routine. E.g., "Read for 15 minutes".' },
+                        category: { type: gemini.Type.STRING, description: 'A relevant category for the routine. E.g., "Mindfulness", "Learning".' }
+                    },
+                    required: ['routineTitle', 'category']
+                }
+            },
+            {
+                name: 'add_new_skill',
+                description: 'Adds a new skill to the user\'s profile for tracking.',
+                parameters: {
+                    type: gemini.Type.OBJECT,
+                    properties: {
+                        skillName: { type: gemini.Type.STRING, description: 'The name of the skill to add. E.g., "Python".' }
+                    },
+                    required: ['skillName']
+                }
+            },
+            {
+                name: 'update_skill_level',
+                description: 'Updates the user\'s proficiency level for an existing skill.',
+                parameters: {
+                    type: gemini.Type.OBJECT,
+                    properties: {
+                        skillName: { type: gemini.Type.STRING, description: 'The name of the skill to update. E.g., "Python".' },
+                        newLevel: { type: gemini.Type.NUMBER, description: 'The new proficiency level, from 0 to 100.' }
+                    },
+                    required: ['skillName', 'newLevel']
+                }
+            },
+            {
+                name: 'create_learning_roadmap',
+                description: 'Generates and saves a detailed, step-by-step learning roadmap for a new skill.',
+                parameters: {
+                    type: gemini.Type.OBJECT,
+                    properties: {
+                        skillName: { type: gemini.Type.STRING, description: 'The skill to create a roadmap for. E.g., "Machine Learning".' }
+                    },
+                    required: ['skillName']
                 }
             }
         ]
@@ -73,9 +119,16 @@ export const createAIChat = async (): Promise<any | null> => {
     return gemini.ai.chats.create({
         model: model,
         config: {
-            systemInstruction: 'You are EvolvEdge AI, a smart personal development assistant. You help users track, grow, and optimize their skills, goals, and habits by providing guidance, insights, and personalized recommendations. You can also schedule events in the user\'s planner by using the `create_plan` tool. Keep your responses concise, encouraging, and actionable.'
+            systemInstruction: `You are EvolvEdge AI, a personal master AI assistant. You help users track, grow, and optimize their skills, goals, and habits. You have been upgraded with new abilities. You can now directly manage the user's profile by using your tools. You can:
+- Schedule events in their planner (\`create_plan\`).
+- Add new goals to their goal tracker (\`add_new_goal\`).
+- Add new daily routines (\`add_daily_routine\`).
+- Add new skills they want to learn (\`add_new_skill\`).
+- Update their proficiency level in existing skills (\`update_skill_level\`).
+- Generate and save a detailed learning roadmap for a new skill (\`create_learning_roadmap\`).
+Be proactive and conversational. When a user asks for help, suggest concrete actions and use your tools to execute them. For example, if they say 'I want to get better at Python', you can add 'Python' as a skill, and ask if they want a learning roadmap.`
         },
-        tools: [plannerTool]
+        tools: [tools]
     });
 };
 

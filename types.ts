@@ -6,11 +6,17 @@ export interface Skill {
   level: number;
 }
 
+export interface Task {
+  id: string;
+  description: string;
+  completed: boolean;
+}
+
 export interface Goal {
   id: string;
   title: string;
   completed: boolean;
-  tasks: { description: string; completed: boolean }[];
+  tasks: Task[];
 }
 
 export interface Achievement {

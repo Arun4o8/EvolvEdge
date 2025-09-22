@@ -1,16 +1,20 @@
+
 import React from 'react';
 import { useState, useRef, useEffect, useContext } from 'react';
 import { ChatMessage, PlannerEvent, ChatConversation } from '../types';
-import { createAIChat } from '../services/geminiService';
+import { createAIChat, getSkillAssessmentAndRoadmap } from '../services/geminiService';
 import { SendIcon, SparklesIcon, UserIcon, MicrophoneIcon, PlusIcon, HistoryIcon, TrashIcon, CloseIcon, SearchIcon } from '../constants';
 import { StandaloneHeader } from '../components/StandaloneHeader';
 import { PlannerContext } from '../context/PlannerContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
+import { SkillContext } from '../context/SkillContext';
+import { useGoals } from '../context/GoalContext';
+import { RoutineContext } from '../context/RoutineContext';
 
 const createInitialMessage = (): ChatMessage => ({
     id: '1',
-    text: "Hello! How can I help you evolve today? You can ask me to schedule tasks for you.",
+    text: "Hello! I am your personal Master AI. How can I help you evolve today? I can now manage your skills, goals, routines, and planner.",
     sender: 'ai',
     timestamp: new Date().toISOString()
 });
@@ -39,7 +43,12 @@ export const AIChatScreen: React.FC = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatRef = useRef<any | null>(null);
     const recognitionRef = useRef<any | null>(null);
+
     const plannerContext = useContext(PlannerContext);
+    const skillContext = useContext(SkillContext);
+    const goalContext = useGoals();
+    const routineContext = useContext(RoutineContext);
+
 
     useEffect(() => {
         if (!user) return;
@@ -208,10 +217,30 @@ export const AIChatScreen: React.FC = () => {
     const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     useEffect(scrollToBottom, [messages]);
 
+    const saveRoadmap = async (skillTitle: string, roadmapContent: string): Promise<{ success: boolean; message: string }> => {
+        if (!user) return { success: false, message: "User not logged in." };
+        try {
+            const { error } = await supabase.from('roadmaps').insert({
+                user_id: user.id,
+                skill_title: skillTitle.trim(),
+                roadmap_content: roadmapContent,
+            });
+            if (error) throw error;
+            return { success: true, message: `Roadmap for ${skillTitle} saved successfully.` };
+        } catch (error: any) {
+            if (error.message.includes('Could not find the table')) {
+                console.warn("Backend missing 'roadmaps' table. Roadmap not saved.");
+                return { success: false, message: "Could not save roadmap due to a database configuration issue." };
+            }
+            console.error("Error saving roadmap:", error.message);
+            return { success: false, message: "An error occurred while saving the roadmap." };
+        }
+    };
+
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
         const currentInput = input.trim();
-        if (currentInput === '' || isSending || !plannerContext || !activeConversationId || !user) return;
+        if (currentInput === '' || isSending || !user || !activeConversationId || !plannerContext || !skillContext || !goalContext || !routineContext ) return;
 
         setIsSending(true);
         setInput('');
@@ -221,23 +250,14 @@ export const AIChatScreen: React.FC = () => {
 
         try {
             if (!activeConversationId.startsWith('mock-')) {
-                const { error: userMsgError } = await supabase.from('chat_messages').insert({ text: currentInput, sender: 'user', conversation_id: activeConversationId });
-                if (userMsgError) throw userMsgError;
+                await supabase.from('chat_messages').insert({ text: currentInput, sender: 'user', conversation_id: activeConversationId });
             }
             
             if (messages.length <= 1) { 
                 const newTitle = currentInput.substring(0, 30) + (currentInput.length > 30 ? '...' : '');
                 setConversations(prev => prev.map(c => c.id === activeConversationId ? {...c, title: newTitle} : c));
                 if (!activeConversationId.startsWith('mock-')) {
-                    const { error: updateError } = await supabase.from('chat_conversations').update({ title: newTitle }).eq('id', activeConversationId);
-                    if (updateError) {
-                        // Don't throw, just log. Title update failing isn't critical.
-                        if (updateError.message.includes('Could not find the table')) {
-                            console.warn("Backend missing 'chat_conversations' table. Title not updated in DB.");
-                        } else {
-                            console.error("Error updating title:", updateError.message);
-                        }
-                    }
+                    await supabase.from('chat_conversations').update({ title: newTitle }).eq('id', activeConversationId);
                 }
             }
             
@@ -245,16 +265,40 @@ export const AIChatScreen: React.FC = () => {
             
             let response = await chatRef.current.sendMessage({ message: currentInput });
 
+            // Loop to handle multiple sequential tool calls
             while (true) {
                 const functionCallPart = response.candidates?.[0]?.content?.parts?.find((part: any) => part.functionCall);
                 if (!functionCallPart) break;
+                
                 const { name, args } = functionCallPart.functionCall;
+                let functionResponse = { success: false, message: 'Function not recognized or failed.' };
+
                 if (name === 'create_plan' && args.title && args.date && args.time && args.category) {
                     plannerContext.addEvent(args);
-                    response = await chatRef.current.sendMessage({ message: { functionResponse: { name: 'create_plan', response: { success: true, message: `Event '${args.title}' scheduled.` } } } });
-                } else {
-                    response = await chatRef.current.sendMessage({ message: { functionResponse: { name: 'create_plan', response: { success: false, message: 'Missing args.' } } } });
+                    functionResponse = { success: true, message: `Event '${args.title}' scheduled.` };
+                } else if (name === 'add_new_goal' && args.goalTitle) {
+                    await goalContext.addGoal({ title: args.goalTitle });
+                    functionResponse = { success: true, message: `Goal '${args.goalTitle}' has been added.` };
+                } else if (name === 'add_new_skill' && args.skillName) {
+                    await skillContext.addSkill({ subject: args.skillName });
+                    functionResponse = { success: true, message: `Skill '${args.skillName}' has been added to your profile.` };
+                } else if (name === 'update_skill_level' && args.skillName && args.newLevel !== undefined) {
+                    skillContext.updateSkill(args.skillName, args.newLevel);
+                    functionResponse = { success: true, message: `Skill '${args.skillName}' updated to ${args.newLevel}%.` };
+                } else if (name === 'add_daily_routine' && args.routineTitle && args.category) {
+                    routineContext.initializeRoutines([{ title: args.routineTitle, category: args.category }]);
+                    functionResponse = { success: true, message: `Routine '${args.routineTitle}' has been added.` };
+                } else if (name === 'create_learning_roadmap' && args.skillName) {
+                    const roadmapContent = await getSkillAssessmentAndRoadmap(args.skillName, skillContext.skills);
+                    if (roadmapContent.includes("Sorry")) {
+                         functionResponse = { success: false, message: roadmapContent };
+                    } else {
+                        const saveResult = await saveRoadmap(args.skillName, roadmapContent);
+                        functionResponse = saveResult;
+                    }
                 }
+
+                response = await chatRef.current.sendMessage({ message: { functionResponse: { name, response: functionResponse } } });
             }
             
             const aiText = response.text;
@@ -262,20 +306,15 @@ export const AIChatScreen: React.FC = () => {
                 const aiMessage: ChatMessage = { id: `temp-ai-${Date.now()}`, text: aiText, sender: 'ai', timestamp: new Date().toISOString() };
                 setMessages(prev => [...prev, aiMessage]);
                 if (!activeConversationId.startsWith('mock-')) {
-                    const { error: aiMsgError } = await supabase.from('chat_messages').insert({ text: aiText, sender: 'ai', conversation_id: activeConversationId });
-                    if (aiMsgError) throw aiMsgError;
+                    await supabase.from('chat_messages').insert({ text: aiText, sender: 'ai', conversation_id: activeConversationId });
                 }
             } else if (!response.candidates?.[0]?.content?.parts?.find((part: any) => part.functionCall)) {
                 setMessages(prev => [...prev, { id: Date.now().toString(), text: "I'm not sure how to respond to that.", sender: 'ai', timestamp: new Date().toISOString(), error: true }]);
             }
 
         } catch (error: any) {
-            if (error.message.includes('Could not find the table')) {
-                console.warn("Backend missing chat tables. Message only saved to local state.");
-            } else {
-                console.error("AI chat failed:", error.message);
-                setMessages(prev => [...prev, { id: Date.now().toString(), text: "Sorry, something went wrong.", sender: 'ai', timestamp: new Date().toISOString(), error: true }]);
-            }
+            console.error("AI chat failed:", error.message);
+            setMessages(prev => [...prev, { id: Date.now().toString(), text: "Sorry, something went wrong.", sender: 'ai', timestamp: new Date().toISOString(), error: true }]);
         } finally {
             setIsSending(false);
         }

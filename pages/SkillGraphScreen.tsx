@@ -1,3 +1,4 @@
+
 import React, { useContext, useState } from 'react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Skill } from '../types';
@@ -48,7 +49,7 @@ export const SkillGraphScreen: React.FC = () => {
   const { skills, isLoading } = skillContext;
   
   const handleAskCoach = () => {
-    navigate('/skill-coach', { state: { skills } });
+    navigate('/ai-chat');
   };
   
   const handleGetAnalytics = async () => {
@@ -149,8 +150,8 @@ export const SkillGraphScreen: React.FC = () => {
           onClick={handleAskCoach}
           className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors shadow-md"
         >
-          <MicrophoneIcon />
-          Ask AI Skill Coach
+          <SparklesIcon />
+          Ask Your Master AI
         </button>
         <button 
           onClick={() => setIsAssessmentModalOpen(true)}
