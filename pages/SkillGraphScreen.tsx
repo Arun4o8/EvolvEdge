@@ -5,7 +5,7 @@ import { useTheme } from '../hooks/useTheme';
 // FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
 import * as ReactRouterDOM from 'react-router-dom';
 const { useNavigate } = ReactRouterDOM;
-import { CheckBadgeIcon, CloseIcon, PencilIcon, SearchIcon, SparklesIcon, TrashIcon } from '../constants';
+import { CheckBadgeIcon, CloseIcon, PencilIcon, SearchIcon, SparklesIcon, TrashIcon, PlusIcon } from '../constants';
 import { SkillContext } from '../context/SkillContext';
 import { getSkillAnalytics, getSkillAssessmentAndRoadmap, validateSkillWithCertificate, fileToBase64, SkillValidationResponse } from '../services/geminiService';
 import { useAuth } from '../context/AuthContext';
@@ -28,7 +28,6 @@ export const SkillGraphScreen: React.FC = () => {
   
   const [analytics, setAnalytics] = useState<string>('');
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
-  const [editMode, setEditMode] = useState(false);
 
   // State for Assessment Modal
   const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
@@ -56,7 +55,7 @@ export const SkillGraphScreen: React.FC = () => {
   };
 
   if (!skillContext) return null;
-  const { skills, isLoading, deleteSkill, updateSkill } = skillContext;
+  const { skills, isLoading, updateSkill, addSkill } = skillContext;
   
   const handleAskCoach = () => {
     navigate('/ai-chat');
@@ -98,6 +97,9 @@ export const SkillGraphScreen: React.FC = () => {
     setIsSavingRoadmap(true);
     setRoadmapSaved(false);
     try {
+        // Automatically add the new skill to the user's profile
+        await addSkill({ subject: newSkillQuery.trim() });
+
         const { error } = await supabase.from('roadmaps').insert({
             user_id: user.id,
             skill_title: newSkillQuery.trim(),
@@ -207,20 +209,9 @@ export const SkillGraphScreen: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">Your Skills</h2>
-          <p className="text-slate-600 dark:text-slate-400">Manage your skills or ask the AI for analysis.</p>
-        </div>
-        {skills.length > 0 && (
-          <button
-            onClick={() => setEditMode(!editMode)}
-            className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
-          >
-            <PencilIcon className="h-4 w-4" />
-            {editMode ? 'Done' : 'Manage'}
-          </button>
-        )}
+      <div>
+        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">Your Skills</h2>
+        <p className="text-slate-600 dark:text-slate-400">Visualize your progress or ask the AI for analysis.</p>
       </div>
 
       <div className="space-y-4">
@@ -231,15 +222,23 @@ export const SkillGraphScreen: React.FC = () => {
           <SparklesIcon />
           Ask Your Master AI
         </button>
-        <button 
-          onClick={() => setIsAssessmentModalOpen(true)}
-          className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-semibold hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors shadow-md border border-slate-200 dark:border-slate-600"
-        >
-          <SearchIcon />
-          Assess a New Skill
-        </button>
+        <div className="grid grid-cols-2 gap-4">
+            <button 
+              onClick={() => setIsAssessmentModalOpen(true)}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-semibold hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors shadow-md border border-slate-200 dark:border-slate-600 text-sm"
+            >
+              <SearchIcon className="h-4 w-4" />
+              Assess a New Skill
+            </button>
+            <button 
+              onClick={() => navigate('/manage-skills')}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-semibold hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors shadow-md border border-slate-200 dark:border-slate-600 text-sm"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Add or Remove Skills
+            </button>
+        </div>
       </div>
-
 
       {skills.length > 0 ? (
         <>
@@ -306,23 +305,13 @@ export const SkillGraphScreen: React.FC = () => {
                                       <div className="bg-primary-600 h-2.5 rounded-full" style={{ width: `${skill.level}%` }}></div>
                                   </div>
                               </div>
-                              {editMode ? (
-                                <button
-                                  onClick={() => deleteSkill(skill.subject)}
-                                  className="p-2 text-slate-400 hover:text-red-500 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex-shrink-0"
-                                  aria-label={`Delete skill: ${skill.subject}`}
-                                >
-                                  <TrashIcon className="h-5 w-5" />
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => openValidationModal(skill)}
-                                  className="p-2 text-slate-400 hover:text-primary-500 rounded-full hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors flex-shrink-0"
-                                  aria-label={`Validate skill: ${skill.subject}`}
-                                >
-                                  <CheckBadgeIcon className="h-5 w-5" />
-                                </button>
-                              )}
+                              <button
+                                onClick={() => openValidationModal(skill)}
+                                className="p-2 text-slate-400 hover:text-primary-500 rounded-full hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors flex-shrink-0"
+                                aria-label={`Validate skill: ${skill.subject}`}
+                              >
+                                <CheckBadgeIcon className="h-5 w-5" />
+                              </button>
                           </div>
                       ))}
                   </div>

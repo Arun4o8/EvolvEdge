@@ -1,8 +1,10 @@
-
 import React from 'react';
+// FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
+import * as ReactRouterDOM from 'react-router-dom';
+const { Link } = ReactRouterDOM;
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../types';
-import { MoonIcon, SunIcon } from '../constants';
+import { ArrowRightIcon, ChartIcon, MoonIcon, SunIcon } from '../constants';
 import { StandaloneHeader } from '../components/StandaloneHeader';
 import { useAuth } from '../context/AuthContext';
 
@@ -55,6 +57,16 @@ export const SettingsScreen: React.FC = () => {
                                 <Toggle />
                             </SettingsItem>
                         </div>
+                    </div>
+                     <div>
+                        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">Profile</h2>
+                        <Link to="/manage-skills" className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                            <div className="flex items-center space-x-3">
+                                <ChartIcon />
+                                <span className="font-medium text-slate-700 dark:text-slate-300">Add or Manage Skills</span>
+                            </div>
+                            <ArrowRightIcon />
+                        </Link>
                     </div>
                     <div>
                         <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1">Account</h2>

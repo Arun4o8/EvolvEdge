@@ -1,5 +1,6 @@
 
 
+
 import React, { useContext } from 'react';
 // FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
 import * as ReactRouterDOM from 'react-router-dom';
@@ -34,6 +35,7 @@ import { RoutineSelectionScreen } from './pages/RoutineSelectionScreen';
 import { WelcomeScreen } from './pages/WelcomeScreen';
 import { RoadmapsScreen } from './pages/RoadmapsScreen';
 import { CareerAdvisorScreen } from './pages/CareerAdvisorScreen';
+import { ManageSkillsScreen } from './pages/ManageSkillsScreen';
 
 const ProtectedRoute: React.FC = () => {
     const { user, loading } = useAuth();
@@ -115,6 +117,7 @@ function App() {
                                 <Route path="/skill-coach" element={<SkillCoachScreen />} />
                                 <Route path="/career-advisor" element={<CareerAdvisorScreen />} />
                                 <Route path="/goals" element={<GoalTrackerScreen />} />
+                                <Route path="/manage-skills" element={<ManageSkillsScreen />} />
                                 
                                 <Route element={<Layout />}>
                                     <Route path="/home" element={<HomeScreen />} />

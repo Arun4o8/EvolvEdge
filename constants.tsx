@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export const MoonIcon: React.FC = () => (
@@ -75,8 +76,9 @@ export const BackIcon: React.FC = () => (
   </svg>
 );
 
-export const PlusIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+// FIX: Updated PlusIcon to accept a className prop to fix its usage in SkillGraphScreen.
+export const PlusIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-6 w-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
     </svg>
 );
