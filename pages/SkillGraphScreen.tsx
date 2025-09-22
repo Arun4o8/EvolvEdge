@@ -1,4 +1,3 @@
-
 import React, { useContext, useState } from 'react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Skill } from '../types';
@@ -6,9 +5,9 @@ import { useTheme } from '../hooks/useTheme';
 // FIX: The bundler/TS setup seems to have trouble with named imports from 'react-router-dom'. Using a namespace import instead.
 import * as ReactRouterDOM from 'react-router-dom';
 const { useNavigate } = ReactRouterDOM;
-import { CloseIcon, PencilIcon, SearchIcon, SparklesIcon, TrashIcon } from '../constants';
+import { CheckBadgeIcon, CloseIcon, PencilIcon, SearchIcon, SparklesIcon, TrashIcon } from '../constants';
 import { SkillContext } from '../context/SkillContext';
-import { getSkillAnalytics, getSkillAssessmentAndRoadmap } from '../services/geminiService';
+import { getSkillAnalytics, getSkillAssessmentAndRoadmap, validateSkillWithCertificate, fileToBase64, SkillValidationResponse } from '../services/geminiService';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
@@ -31,12 +30,22 @@ export const SkillGraphScreen: React.FC = () => {
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
+  // State for Assessment Modal
   const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
   const [newSkillQuery, setNewSkillQuery] = useState('');
   const [assessmentResult, setAssessmentResult] = useState('');
   const [isAssessing, setIsAssessing] = useState(false);
   const [isSavingRoadmap, setIsSavingRoadmap] = useState(false);
   const [roadmapSaved, setRoadmapSaved] = useState(false);
+
+  // State for Validation Modal
+  const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
+  const [validatingSkill, setValidatingSkill] = useState<Skill | null>(null);
+  const [certificateFile, setCertificateFile] = useState<File | null>(null);
+  const [validationResult, setValidationResult] = useState<SkillValidationResponse | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
 
   const isDark = theme === 'dark';
   const textColor = isDark ? '#e2e8f0' : '#475569';
@@ -46,8 +55,8 @@ export const SkillGraphScreen: React.FC = () => {
     borderColor: isDark ? '#334155' : '#e2e8f0',
   };
 
-  if (!skillContext) return null; // Or a loading spinner
-  const { skills, isLoading, deleteSkill } = skillContext;
+  if (!skillContext) return null;
+  const { skills, isLoading, deleteSkill, updateSkill } = skillContext;
   
   const handleAskCoach = () => {
     navigate('/ai-chat');
@@ -67,6 +76,7 @@ export const SkillGraphScreen: React.FC = () => {
     }
   };
 
+  // --- Assessment Modal Logic ---
   const handleGetAssessment = async () => {
     if (!newSkillQuery.trim()) return;
     setIsAssessing(true);
@@ -115,6 +125,59 @@ export const SkillGraphScreen: React.FC = () => {
     setAssessmentResult('');
     setNewSkillQuery('');
     setRoadmapSaved(false);
+  };
+
+  // --- Validation Modal Logic ---
+  const openValidationModal = (skill: Skill) => {
+    setValidatingSkill(skill);
+    setIsValidationModalOpen(true);
+  };
+  
+  const closeValidationModal = () => {
+    setIsValidationModalOpen(false);
+    setValidatingSkill(null);
+    setCertificateFile(null);
+    setValidationResult(null);
+    setIsValidating(false);
+    setValidationError(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setCertificateFile(e.target.files[0]);
+      setValidationResult(null);
+      setValidationError(null);
+    }
+  };
+
+  const handleValidateCertificate = async () => {
+    if (!certificateFile || !validatingSkill) return;
+    
+    setIsValidating(true);
+    setValidationResult(null);
+    setValidationError(null);
+
+    try {
+      const base64Image = await fileToBase64(certificateFile);
+      const result = await validateSkillWithCertificate(validatingSkill.subject, base64Image);
+      if (!result.is_certificate) {
+          setValidationError(result.assessment || "The AI could not confirm this is a valid certificate for the specified skill.");
+      } else {
+          setValidationResult(result);
+      }
+    } catch (error) {
+      console.error("Certificate validation failed:", error);
+      setValidationError("An unexpected error occurred during analysis. Please try again.");
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleAcceptValidation = () => {
+    if (validatingSkill && validationResult) {
+      updateSkill(validatingSkill.subject, validationResult.suggested_level);
+      closeValidationModal();
+    }
   };
 
   if (isLoading) {
@@ -243,13 +306,21 @@ export const SkillGraphScreen: React.FC = () => {
                                       <div className="bg-primary-600 h-2.5 rounded-full" style={{ width: `${skill.level}%` }}></div>
                                   </div>
                               </div>
-                              {editMode && (
+                              {editMode ? (
                                 <button
                                   onClick={() => deleteSkill(skill.subject)}
                                   className="p-2 text-slate-400 hover:text-red-500 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex-shrink-0"
                                   aria-label={`Delete skill: ${skill.subject}`}
                                 >
                                   <TrashIcon className="h-5 w-5" />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => openValidationModal(skill)}
+                                  className="p-2 text-slate-400 hover:text-primary-500 rounded-full hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors flex-shrink-0"
+                                  aria-label={`Validate skill: ${skill.subject}`}
+                                >
+                                  <CheckBadgeIcon className="h-5 w-5" />
                                 </button>
                               )}
                           </div>
@@ -311,6 +382,52 @@ export const SkillGraphScreen: React.FC = () => {
                     </button>
                  </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {isValidationModalOpen && validatingSkill && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={closeValidationModal}>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
+              <h2 className="text-lg font-bold flex items-center gap-2"><CheckBadgeIcon /> Validate Skill: {validatingSkill.subject}</h2>
+              <button onClick={closeValidationModal} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"><CloseIcon /></button>
+            </div>
+            <div className="p-4 space-y-4 overflow-y-auto">
+              <p className="text-sm text-slate-600 dark:text-slate-400">Upload a certificate of completion to get AI-powered validation and update your skill level.</p>
+              
+              <div>
+                <label htmlFor="certificate-upload" className="w-full text-center block cursor-pointer px-4 py-3 bg-slate-100 dark:bg-slate-700 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">
+                  {certificateFile ? `Selected: ${certificateFile.name}` : "Click to Upload Certificate Image"}
+                </label>
+                <input id="certificate-upload" type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+              </div>
+
+              {isValidating ? (
+                <p className="text-center p-4">Analyzing your certificate...</p>
+              ) : validationError ? (
+                <p className="p-3 text-center bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 rounded-lg">{validationError}</p>
+              ) : validationResult && (
+                <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-700">
+                  <h3 className="font-bold text-green-800 dark:text-green-200">Validation Successful!</h3>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 italic">"{validationResult.assessment}"</p>
+                  <div className="text-center">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Suggested New Level:</p>
+                    <p className="text-3xl font-bold text-primary-600 dark:text-primary-400">{validationResult.suggested_level}%</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
+                <button onClick={closeValidationModal} className="px-4 py-2 rounded-lg text-slate-700 dark:text-slate-300 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">Cancel</button>
+                {validationResult ? (
+                  <button onClick={handleAcceptValidation} className="px-4 py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700">Accept & Update</button>
+                ) : (
+                  <button onClick={handleValidateCertificate} disabled={!certificateFile || isValidating} className="px-4 py-2 rounded-lg bg-primary-600 text-white font-semibold hover:bg-primary-700 disabled:bg-primary-300">
+                    {isValidating ? 'Analyzing...' : 'Analyze'}
+                  </button>
+                )}
             </div>
           </div>
         </div>

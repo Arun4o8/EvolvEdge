@@ -1,4 +1,3 @@
-
 import { LearningResource, Skill, Goal } from '../types';
 
 let geminiPromise: Promise<{
@@ -392,6 +391,77 @@ export const getCareerAdvice = async (skills: Skill[], goals: Pick<Goal, 'title'
         return text.trim();
     } catch (error) {
         console.error("Failed to get AI career advice:", error);
+        return fallbackResponse;
+    }
+};
+
+// --- New Feature: Skill Validation ---
+export const fileToBase64 = (file: File): Promise<{mimeType: string, data: string}> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+        const result = reader.result as string;
+        // result is in the format "data:image/jpeg;base64,LzlqLzRBQ...""
+        const [mimeInfo, data] = result.split(',');
+        const mimeType = mimeInfo.split(':')[1].split(';')[0];
+        resolve({ mimeType, data });
+    };
+    reader.onerror = error => reject(error);
+  });
+};
+
+export interface SkillValidationResponse {
+    is_certificate: boolean;
+    assessment: string;
+    suggested_level: number;
+}
+
+export const validateSkillWithCertificate = async (skillName: string, image: {mimeType: string, data: string}): Promise<SkillValidationResponse> => {
+    const gemini = await initializeGemini();
+    const fallbackResponse: SkillValidationResponse = { is_certificate: false, assessment: "Sorry, I couldn't analyze the certificate at this time. Please try again later.", suggested_level: 0 };
+    if (!gemini) return fallbackResponse;
+
+    try {
+        const imagePart = {
+            inlineData: {
+                mimeType: image.mimeType,
+                data: image.data
+            }
+        };
+
+        const textPart = {
+            text: `Analyze the provided image for the skill "${skillName}". Determine if it's a legitimate certificate of completion. Evaluate its level (e.g., beginner, intermediate, advanced). Based on this, suggest a new proficiency level as a percentage. Respond ONLY with a valid JSON object.`
+        };
+
+        const response = await gemini.ai.models.generateContent({
+            model: model, // gemini-2.5-flash supports vision
+            contents: { parts: [imagePart, textPart] },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: gemini.Type.OBJECT,
+                    properties: {
+                        is_certificate: { type: gemini.Type.BOOLEAN, description: "True if the image is a valid skill certificate, otherwise false." },
+                        assessment: { type: gemini.Type.STRING, description: "A brief, one-sentence summary of the certificate's level and what it signifies." },
+                        suggested_level: { type: gemini.Type.NUMBER, description: "The suggested new skill proficiency level (a number between 10 and 100)." }
+                    },
+                    required: ['is_certificate', 'assessment', 'suggested_level']
+                }
+            }
+        });
+
+        const jsonText = response.text;
+        if (!jsonText) {
+            console.warn("AI skill validation response was empty or blocked.");
+            return fallbackResponse;
+        }
+
+        const parsedResponse = JSON.parse(jsonText.trim());
+        return parsedResponse as SkillValidationResponse;
+
+    } catch (error) {
+        console.error("Failed to get AI skill validation:", error);
         return fallbackResponse;
     }
 };
