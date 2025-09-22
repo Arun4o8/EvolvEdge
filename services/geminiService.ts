@@ -1,10 +1,42 @@
 import { LearningResource, Skill, Goal } from '../types';
 
+// --- Caching Helpers ---
+const getCachedData = <T>(key: string): { data: T; timestamp: number } | null => {
+    const cached = localStorage.getItem(key);
+    if (cached) {
+        try {
+            const parsed = JSON.parse(cached);
+            if ('data' in parsed && 'timestamp' in parsed) {
+                return parsed as { data: T; timestamp: number };
+            }
+            return null;
+        } catch (e) {
+            console.error(`Failed to parse cache for key "${key}":`, e);
+            return null;
+        }
+    }
+    return null;
+};
+
+const setCachedData = <T>(key: string, data: T) => {
+    try {
+        const cacheEntry = {
+            data,
+            timestamp: Date.now(),
+        };
+        localStorage.setItem(key, JSON.stringify(cacheEntry));
+    } catch (e) {
+        console.error(`Failed to set cache for key "${key}":`, e);
+    }
+};
+
+
 let geminiPromise: Promise<{
     ai: any;
     Type: any;
 } | null> | null = null;
 
+// Use gemini-2.5-flash, a powerful and free model suitable for a wide range of tasks.
 const model = 'gemini-2.5-flash';
 
 function initializeGemini() {
@@ -132,6 +164,14 @@ Be proactive and conversational. When a user asks for help, suggest concrete act
 };
 
 export const getAIQuote = async (): Promise<string> => {
+    const CACHE_KEY = 'ai_quote_cache';
+    const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+    const cached = getCachedData<string>(CACHE_KEY);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+        return cached.data;
+    }
+    
     const gemini = await initializeGemini();
     const fallbackQuote = "The only way to do great work is to love what you do.";
 
@@ -154,16 +194,30 @@ export const getAIQuote = async (): Promise<string> => {
         const text = response.text;
         if (!text) {
             console.warn("AI quote response was empty or blocked.");
-            return fallbackQuote;
+            return cached?.data ?? fallbackQuote;
         }
-        return text.trim();
+        const quote = text.trim();
+        setCachedData(CACHE_KEY, quote);
+        return quote;
     } catch (error) {
         console.error("Failed to get AI quote:", error);
+        // If API fails, return the old cached quote if it exists, even if stale
+        if (cached) {
+            return cached.data;
+        }
         return fallbackQuote;
     }
 };
 
 export const getAIRecommendations = async (): Promise<LearningResource[]> => {
+    const CACHE_KEY = 'ai_recommendations_cache';
+    const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+
+    const cached = getCachedData<LearningResource[]>(CACHE_KEY);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+        return cached.data;
+    }
+
     const gemini = await initializeGemini();
 
     const fallbackData: LearningResource[] = [
@@ -209,16 +263,22 @@ export const getAIRecommendations = async (): Promise<LearningResource[]> => {
         const jsonText = response.text;
         if (!jsonText) {
             console.warn("AI recommendations response was empty or blocked.");
-            return fallbackData;
+            return cached?.data ?? fallbackData;
         }
 
         const parsedResponse = JSON.parse(jsonText.trim());
         const resources = parsedResponse.resources || [];
         
-        return resources.map((r: any, index: number) => ({ ...r, id: (index + 1).toString() } as LearningResource));
+        const finalResources = resources.map((r: any, index: number) => ({ ...r, id: (index + 1).toString() } as LearningResource));
+        setCachedData(CACHE_KEY, finalResources);
+        return finalResources;
 
     } catch (error) {
         console.error("Failed to get AI recommendations:", error);
+        // If API fails, return stale cache if available
+        if (cached) {
+            return cached.data;
+        }
         return fallbackData;
     }
 };
